@@ -18,10 +18,15 @@ setup(
     'einx>=0.3.0',
     'einops>=0.8.0',
     'packaging>=21.0',
+    'open3d>=0.19.0',
+    'deprecated>=1.2.18',
+    'numpy>=1.26.0',
+    'pyyaml>=6.0.1',
   ],
   setup_requires=[
     'pytest-runner',
   ],
+
   tests_require=[
     'pytest'
   ],

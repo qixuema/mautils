@@ -2,6 +2,7 @@ import os
 import numpy as np
 import sys
 import re
+from pathlib import Path
 
 def check_nan_inf(data):
     contains_nan_inf = np.any(np.isnan(data)) or np.any(np.isinf(data))
@@ -27,13 +28,16 @@ def get_file_list_with_extension(folder_path, ext):
     list: 找到的所有指定扩展名文件的路径列表。
     """
     files_with_extension = []
-    for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            # if file.endswith(extension):
-            if any(file.endswith(ext) for ext in ext):
-                full_path = os.path.join(root, file)
-                files_with_extension.append(full_path)
-
+    
+    # 使用 Path 对象遍历文件夹
+    folder_path = Path(folder_path)
+    
+    # 遍历文件夹中的所有文件
+    for file_path in folder_path.rglob('*'):  # rglob('*') 遍历所有子文件夹
+        if file_path.is_file() and any(file_path.suffix.lower() == e.lower() for e in ext):
+            # 使用 .as_posix() 转换为正斜杠格式
+            files_with_extension.append(file_path.as_posix())
+    
     return files_with_extension
 
 def get_parent_directory(file_path):

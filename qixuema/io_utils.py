@@ -1,4 +1,5 @@
 import numpy as np
+import yaml
 
 def read_vertices_obj(filename):
     vertices = []
@@ -88,6 +89,11 @@ def write_obj_file(file_path, vertices, faces=None, vtx_colors=None, is_line=Fal
                 file.write(f"l {face_str}\n")
             else:
                 file.write(f"f {face_str}\n")
+
+# Load configuration from YAML
+def load_yaml(config_path="config.yaml"):
+    with open(config_path, "r") as file:
+        return yaml.safe_load(file)
             
 
 if __name__=="__main__":
@@ -95,3 +101,5 @@ if __name__=="__main__":
     vertices = [(1, 2, 3), (4, 5, 6), (7, 8, 9)]
     faces = [(1, 2, 3)]
     write_obj_file('example.obj', vertices, faces)
+
+
