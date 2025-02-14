@@ -1119,7 +1119,7 @@ def calculate_polyline_lengths_single_batch(points: np.ndarray) -> np.ndarray:
     return polyline_lengths
 
 
-def normalize_edges_points(edge_points, uid=None, is_check_order=False, handleCollinear=True):
+def normalize_edges_points(edge_points, uid=None, is_check_order=False, handleCollinear=True, check_bbox=False):
 
     if check_nan_inf(edge_points):
         print(f'{uid} contains nan or inf')
@@ -1143,15 +1143,17 @@ def normalize_edges_points(edge_points, uid=None, is_check_order=False, handleCo
             # vis_lineset({'vertices': edge_points_i, 'lines': [[i, i + 1] for i in range(len(edge_points_i) - 1)]})
             return None
         
-        center, extent, R = get_vertices_obb(norm_edge_points_i)
-        min_extent = np.min(extent)
+        if check_bbox:
 
-        if min_extent > 0.7: # 这是一个 绝对值
-            print(f'{uid} has non-unit bbox', min_extent) # 主要是排除掉哪些特别扭曲的线，这些线可能会导致训练不稳定
-            # vis_lineset({'vertices': edge_points_i, 'lines': np.array([[i, i + 1] for i in range(len(edge_points_i) - 1)])})
-            # vis_lineset({'vertices': norm_edge_points_i, 'lines': np.array([[i, i + 1] for i in range(len(norm_edge_points_i) - 1)])})
-            # lengths = calculate_polyline_lengths_single_batch(norm_edge_points_i[np.newaxis])
-            return None
+            center, extent, R = get_vertices_obb(norm_edge_points_i)
+            min_extent = np.min(extent)
+
+            if min_extent > 0.7: # 这是一个 绝对值
+                print(f'{uid} has non-unit bbox', min_extent) # 主要是排除掉哪些特别扭曲的线，这些线可能会导致训练不稳定
+                # vis_lineset({'vertices': edge_points_i, 'lines': np.array([[i, i + 1] for i in range(len(edge_points_i) - 1)])})
+                # vis_lineset({'vertices': norm_edge_points_i, 'lines': np.array([[i, i + 1] for i in range(len(norm_edge_points_i) - 1)])})
+                # lengths = calculate_polyline_lengths_single_batch(norm_edge_points_i[np.newaxis])
+                return None
 
         new_edge_points[i] = norm_edge_points_i
 
@@ -1163,10 +1165,11 @@ def normalize_edges_points(edge_points, uid=None, is_check_order=False, handleCo
     return new_edge_points
 
 
-def transform_multi_edges_points(edge_points, start_end=None, uid=None, is_check_order=False, handleCollinear=True):
+def transform_multi_edges_points(edge_points, start_end=None, uid=None, is_check_order=False, handleCollinear=True, check_bbox=False):
     if start_end is None:
         return normalize_edges_points(edge_points, uid, is_check_order)
     
+
 
     if check_nan_inf(edge_points):
         print(f'{uid} contains nan or inf')
@@ -1193,7 +1196,7 @@ def transform_multi_edges_points(edge_points, start_end=None, uid=None, is_check
 
     return new_edge_points
 
-def normalize_edge_points_two_stage(edge_points):
+def normalize_edge_points_two_stage(edge_points, check_bbox=False):
  
     num_lines = edge_points.shape[0]
 
@@ -1202,7 +1205,7 @@ def normalize_edge_points_two_stage(edge_points):
     if edge_points_middle_status is None:
         return None
     
-    norm_edge_points = normalize_edges_points(edge_points_middle_status, handleCollinear=False)
+    norm_edge_points = normalize_edges_points(edge_points_middle_status, handleCollinear=False, check_bbox=check_bbox)
     
     if norm_edge_points is None:
         return None
