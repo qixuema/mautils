@@ -3,6 +3,30 @@ import numpy as np
 import sys
 import re
 from pathlib import Path
+import datetime
+
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group['lr']
+
+def exists(x):
+    return x is not None
+
+def get_current_time():
+    # 获取当前时间
+    current_time = datetime.datetime.now()
+    # 格式化输出时间
+    formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+    
+    return formatted_time
+
+def cycle(dl):
+    while True:
+        for data in dl:
+            yield data
+
+def divisible_by(num, den):
+    return (num % den) == 0
 
 def check_nan_inf(data):
     contains_nan_inf = np.any(np.isnan(data)) or np.any(np.isinf(data))
@@ -290,3 +314,6 @@ def interpolate_1d(
     interpolated = (1 - alpha) * left_values + alpha * right_values
     
     return interpolated
+
+
+
