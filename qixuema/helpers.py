@@ -28,6 +28,14 @@ def cycle(dl):
 def divisible_by(num, den):
     return (num % den) == 0
 
+def is_odd(n):
+    return not divisible_by(n, 2)
+
+def default(val, d):
+    if exists(val):
+        return val
+    return d() if callable(d) else d
+
 def check_nan_inf(data):
     contains_nan_inf = np.any(np.isnan(data)) or np.any(np.isinf(data))
     if contains_nan_inf:

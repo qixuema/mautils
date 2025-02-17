@@ -1,11 +1,14 @@
 import numpy as np
 from einops import rearrange, repeat
+from typing import Optional
 import heapq
 from deprecated import deprecated
-# from misc.helpful_fn import check_nan_inf
 from qixuema.helpers import check_nan_inf
 from qixuema.o3d_utils import get_vertices_obb
 import open3d as o3d
+import logging
+
+logger = logging.getLogger(__name__)
 
 START_END = np.array(
     [[0.0, 0.0, 0.0], 
@@ -375,19 +378,6 @@ def rotate_around_z(vertices, theta):
     rotated_vertices = vertices @ rotation_matrix.T
     
     return rotated_vertices
-
-# 测试接口
-if __name__ == "__main__":
-    points = np.array([
-        [1, 2, 3],
-        [4, 5, 6],
-        [7, 8, 9]
-        # 更多点...
-    ])
-    
-    translated_points = translate_to_origin(points)
-    print("平移后的点集：")
-    print(translated_points)
 
 
 def judge_flattened_objects(points, aspect_ratio_threshold=5.0, return_indices=False):
@@ -976,6 +966,38 @@ def inverse_transform_polyline(transformed_points, start_and_end, handleCollinea
     return restored_points
 
 
+
+def denormalize_edges_points(
+    normalized_curves: np.ndarray, corners: np.ndarray
+) -> Optional[np.ndarray]:
+    """
+    使用给定的角点反归一化边点。
+    """
+    start_end = np.array(
+        [[0.0, 0.0, 0.0], 
+        [0.54020254, -0.77711392, 0.32291667]]
+    )
+
+    recon_curves = []
+    for i, corner in enumerate(corners):
+        if np.linalg.norm(corner[0] - corner[1]) == 0:
+            logger.warning(f"Corner {i} has zero length.")
+            continue  # 跳过长度为零的线段
+        
+        # curve = inverse_transform_polyline(normalized_curves[i], corner)
+        curve_0 = inverse_transform_polyline(normalized_curves[i], start_and_end=start_end) 
+        curve = inverse_transform_polyline(curve_0, start_and_end=corner)             
+            
+        if curve is None:
+            logger.warning(f"Curve {i} is None.")
+            continue
+        recon_curves.append(curve)
+
+    if recon_curves:
+        return np.stack(recon_curves, axis=0)
+    else:
+        return None
+
 @deprecated
 def inverse_transform_polyline_old(transformed_points, start_and_end):
     original_start, original_end = start_and_end
@@ -1241,3 +1263,18 @@ def remove_unused_vertices(lineset):
         'vertices': updated_vertices,
         'lines': updated_edges
     }
+    
+
+
+# # 测试接口
+# if __name__ == "__main__":
+#     points = np.array([
+#         [1, 2, 3],
+#         [4, 5, 6],
+#         [7, 8, 9]
+#         # 更多点...
+#     ])
+    
+#     translated_points = translate_to_origin(points)
+#     print("平移后的点集：")
+#     print(translated_points)
