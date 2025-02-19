@@ -81,3 +81,17 @@ def calculate_polyline_lengths(points: TensorType['b', 'n', 3, float]) -> Tensor
     polyline_lengths = distances.sum(dim=1)
 
     return polyline_lengths
+
+def down_sample_edge_points(batch_edge_points, num_points=32):
+    # edge_points: (bs, 256, 3)
+    batch_edge_points = rearrange(batch_edge_points, 'b n c -> b c n')
+    
+    t = torch.linspace(0, 1, num_points).to(batch_edge_points.device)
+    bs = batch_edge_points.shape[0]
+    t = repeat(t, 'n -> b n', b=bs)
+    
+    batch_edge_points = interpolate_1d(t, batch_edge_points)
+    
+    batch_edge_points = rearrange(batch_edge_points, 'b c n -> b n c')
+    
+    return batch_edge_points

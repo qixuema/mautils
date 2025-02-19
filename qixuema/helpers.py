@@ -5,6 +5,9 @@ import re
 from pathlib import Path
 import datetime
 
+def first(it):
+    return it[0]
+
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
@@ -63,6 +66,10 @@ def get_file_list_with_extension(folder_path, ext):
     
     # 使用 Path 对象遍历文件夹
     folder_path = Path(folder_path)
+    
+    # if ext is str, then convert to list
+    if isinstance(ext, str):
+        ext = [ext]
     
     # 遍历文件夹中的所有文件
     for file_path in folder_path.rglob('*'):  # rglob('*') 遍历所有子文件夹

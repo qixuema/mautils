@@ -2,6 +2,7 @@ import numpy as np
 from einops import rearrange, repeat
 from typing import Optional
 import heapq
+from scipy.interpolate import interp1d
 from deprecated import deprecated
 from qixuema.helpers import check_nan_inf
 from qixuema.o3d_utils import get_vertices_obb
@@ -1263,7 +1264,93 @@ def remove_unused_vertices(lineset):
         'vertices': updated_vertices,
         'lines': updated_edges
     }
+
+def cumulative_polyline_length(polyline):
+    """
+    计算非闭合 polyline 的累计长度。
+
+    参数:
+        polyline (np.ndarray): 形状为 (256, 3) 的 polyline 坐标数组。
+
+    返回:
+        np.ndarray: 累计长度数组，形状为 (257,)。
+    """
+    # 计算每两个相邻点之间的差值
+    deltas = np.diff(polyline, axis=0)
+    # 计算每段的长度
+    seg_lengths = np.linalg.norm(deltas, axis=1)
+    # 累计长度，从 0 开始
+    cum_length = np.concatenate(([0], np.cumsum(seg_lengths)))
+    return cum_length
+
+def sample_polyline(polyline, step=0.02):
+    """
+    沿着 polyline 进行采样，最小距离为 step。
+
+    参数:
+        polyline (np.ndarray): 形状为 (256, 3) 的 polyline 坐标数组。
+        step (float): 采样的最小距离。
+
+    返回:
+        np.ndarray: 采样后的点云，形状为 (m, 3)，其中 m 取决于 polyline 的总长度。
+    """
+    cum_length = cumulative_polyline_length(polyline)
+    total_length = cum_length[-1]
     
+    # 生成采样点的距离位置
+    num_samples = int(np.floor(total_length / step))
+    sample_distances = np.linspace(0, num_samples * step, num_samples + 1)
+    
+    # 创建插值函数
+    interp_func_x = interp1d(cum_length, polyline[:, 0], kind='linear')
+    interp_func_y = interp1d(cum_length, polyline[:, 1], kind='linear')
+    interp_func_z = interp1d(cum_length, polyline[:, 2], kind='linear')
+    
+    # 计算采样点的坐标
+    sampled_x = interp_func_x(sample_distances)
+    sampled_y = interp_func_y(sample_distances)
+    sampled_z = interp_func_z(sample_distances)
+    
+    sampled_points = np.stack((sampled_x, sampled_y, sampled_z), axis=1)
+    return sampled_points
+
+
+def sample_polylines(polylines, step=0.02, max_points=2048):
+    """
+    对一组 polylines 进行采样。
+
+    参数:
+        polylines (np.ndarray): 形状为 (n, 256, 3) 的 polyline 数据。
+        step (float): 采样的最小距离。
+
+    返回:
+        np.ndarray: 采样后的点云，形状为 (?, 3)。
+    """
+    sampled_points_list = []
+    n = polylines.shape[0]
+    for i in range(n):
+        polyline = polylines[i]
+        sampled_points = sample_polyline(polyline, step)
+        sampled_points_list.append(sampled_points)
+    # 将所有采样点合并成一个点云
+    all_sampled_points = np.vstack(sampled_points_list)
+    
+    # 判断哪些行包含 NaN
+    valid_rows = ~np.isnan(all_sampled_points).any(axis=1)
+
+    # 通过布尔索引剔除包含 NaN 的行
+    all_sampled_points = all_sampled_points[valid_rows]
+    
+    if all_sampled_points.shape[0] > max_points:
+        random_idx = np.random.choice(all_sampled_points.shape[0], max_points, replace=False)
+        all_sampled_points = all_sampled_points[random_idx]
+    else:
+        random_idx = np.random.choice(all_sampled_points.shape[0], max_points, replace=True)
+        all_sampled_points = all_sampled_points[random_idx]
+    
+    
+    return all_sampled_points
+
 
 
 # # 测试接口
