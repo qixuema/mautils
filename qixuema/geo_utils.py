@@ -2,7 +2,6 @@ import numpy as np
 from einops import rearrange, repeat
 import heapq
 from deprecated import deprecated
-# from misc.helpful_fn import check_nan_inf
 from qixuema.helpers import check_nan_inf
 from qixuema.o3d_utils import get_vertices_obb
 import open3d as o3d
@@ -521,16 +520,25 @@ def create_cube_lineset():
     return lineset
 
 def calculate_length(segment):
-    """计算线段的长度"""
+    """
+    计算线段的长度
+    输入的线段是两个点, segment 是一个 2x3 的数组，表示两个点
+    """
     return np.linalg.norm(segment[0] - segment[1])
 
 def subdivide_segment(segment):
-    """将线段细分为两个等长的线段"""
+    """
+    将线段细分为两个等长的线段
+    输入的线段是两个点, segment 是一个 2x3 的数组，表示两个点
+    """
     midpoint = (segment[0] + segment[1]) / 2
     return np.array([segment[0], midpoint]), np.array([midpoint, segment[1]])
 
 def subdivide_longest_low(segments, max_length=256):
-    """找到并细分最长的线段，直到线段总数达到300"""
+    """
+    找到并细分最长的线段,直到线段总数达到256
+    输入是线段的集合,segments 是一个 nx2x3 的数组，表示 n 个线段，每个线段由两个点组成
+    """
     while len(segments) < max_length:
         lengths = np.array([calculate_length(seg) for seg in segments])
         longest_idx = np.argmax(lengths)
@@ -540,7 +548,7 @@ def subdivide_longest_low(segments, max_length=256):
         segments = np.append(segments, new_segments, axis=0)
     
     # 四舍五入并转换为整数
-    segments = np.round(segments).astype(np.int32)
+    # segments = np.round(segments).astype(np.int32)
     
     return segments
 
