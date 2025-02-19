@@ -64,6 +64,9 @@ def get_file_list_with_extension(folder_path, ext):
     """
     files_with_extension = []
     
+    if isinstance(ext, str):
+        ext = [ext]
+    
     # 使用 Path 对象遍历文件夹
     folder_path = Path(folder_path)
     
