@@ -335,3 +335,48 @@ def interpolate_1d(
 
 
 
+
+
+def interpolate_1d_batch(
+    t,
+    data,
+):
+    """
+    对一批数据进行一维线性插值。
+
+    参数:
+    t (Tensor): 插值坐标，范围在 [0, 1] 之间，形状为 (B, n)。
+    data (Tensor): 原始数据，形状为 (B, num_points, n_channels)。
+
+    返回:
+    Tensor: 插值后的数据，形状为 (B, n, n_channels)。
+    """
+    assert t.ndim == 2, "t 应该是一个二维张量，形状为 (B, n)"
+    assert data.ndim == 3, "data 应该是一个三维张量，形状为 (B, num_points, channels)"
+    B, n = t.shape
+    _, num_points, n_channels = data.shape
+
+    # 将 t 映射到 [0, num_points - 1]
+    t_scaled = t * (num_points - 1)
+
+    left = np.floor(t_scaled).astype(np.int32)
+    right = np.ceil(t_scaled).astype(np.int32)
+    alpha = t_scaled - left
+
+    # clip 防止越界
+    left = np.clip(left, 0, num_points - 1)
+    right = np.clip(right, 0, num_points - 1)
+
+    # 用高级索引取数据：每个 batch 要取自己的点
+    batch_indices = np.arange(B)[:, None]  # shape: (B, 1)
+
+    left_values = data[batch_indices, left]     # shape: (B, n, n_channels)
+    right_values = data[batch_indices, right]   # shape: (B, n, n_channels)
+
+    # alpha shape: (B, n) => (B, n, 1) for broadcasting
+    alpha = alpha[..., None]
+
+    interpolated = (1 - alpha) * left_values + alpha * right_values
+
+    return interpolated
+
