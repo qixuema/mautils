@@ -1361,6 +1361,14 @@ def sample_polylines(polylines, step=0.02, max_points=2048):
     return all_sampled_points
 
 
+def sample_points_from_mesh(mesh, num_samples=10000):
+    
+    # 采样点云及其法向量
+    points, face_indices = mesh.sample(num_samples, return_index=True)
+    normals = mesh.face_normals[face_indices]
+
+    return {'points': points, 'normals': normals}
+
 
 # # 测试接口
 # if __name__ == "__main__":
