@@ -656,7 +656,7 @@ def transform_polyline(points, handleCollinear=True):
 
     return scaled_points
 
-def transform_polyline_to_start_and_end(points, start_end, handleCollinear=True):
+def transform_polyline_to_start_and_end(points, start_end, handleCollinear=True, epsilon=1e-6):
     start_point = start_end[0]
     end_point = start_end[1]
     
@@ -672,15 +672,14 @@ def transform_polyline_to_start_and_end(points, start_end, handleCollinear=True)
         raise ValueError("多段线的起点和终点重合，无法确定方向。")
     
     # 归一化方向向量
-    original_norm = original_vector / (np.linalg.norm(original_vector) + 1e-6)
-    target_norm = target_vector / (np.linalg.norm(target_vector) + 1e-6)
+    original_norm = original_vector / (np.linalg.norm(original_vector) + epsilon)
+    target_norm = target_vector / (np.linalg.norm(target_vector) + epsilon)
     
     # 计算旋转轴和角度
     dot_product = np.dot(original_norm, target_norm)
     angle = np.arccos(np.clip(dot_product, -1.0, 1.0))
     
     # 判断是否需要特殊处理
-    epsilon = 1e-6
     if np.abs(dot_product + 1) < epsilon:
         if not handleCollinear:
             return None
@@ -690,7 +689,7 @@ def transform_polyline_to_start_and_end(points, start_end, handleCollinear=True)
         if np.allclose(original_norm, arbitrary_vector) or np.allclose(original_norm, -arbitrary_vector):
             arbitrary_vector = np.array([0, 1, 0])
         axis = np.cross(original_norm, arbitrary_vector)
-        axis = axis / (np.linalg.norm(axis) + 1e-6)
+        axis = axis / (np.linalg.norm(axis) + epsilon)
         angle = np.pi
     elif np.abs(dot_product - 1) < epsilon:
         if not handleCollinear:
@@ -702,7 +701,7 @@ def transform_polyline_to_start_and_end(points, start_end, handleCollinear=True)
     else:
         # 正常计算旋转轴
         axis = np.cross(original_norm, target_norm)
-        axis = axis / (np.linalg.norm(axis) + 1e-6)
+        axis = axis / (np.linalg.norm(axis) + epsilon)
     
     # Rodrigues' rotation formula
     K = np.array([
@@ -722,7 +721,7 @@ def transform_polyline_to_start_and_end(points, start_end, handleCollinear=True)
     if original_length == 0:
         raise ValueError("多段线长度为零，无法缩放。")
     
-    scale_factor = target_length / (original_length + 1e-6)
+    scale_factor = target_length / (original_length + epsilon)
     scaled_points = rotated_points * scale_factor
     
     # Step 4: 平移到指定的起始点位置

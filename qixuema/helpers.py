@@ -51,7 +51,7 @@ def is_debug():
 def is_close(a, b, atol=1e-5):
     return np.isclose(a, b, atol=atol)
 
-def get_file_list_with_extension(folder_path, ext):
+def get_filepath_list_with_extension(folder_path, ext):
     """
     在给定的文件夹及其子文件夹中查找所有指定扩展名的文件。
 
