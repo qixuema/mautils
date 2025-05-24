@@ -51,36 +51,33 @@ def is_debug():
 def is_close(a, b, atol=1e-5):
     return np.isclose(a, b, atol=atol)
 
-def get_filepath_list_with_extension(folder_path, ext):
+def get_file_list_with_extension(folder_path, ext):
     """
-    在给定的文件夹及其子文件夹中查找所有指定扩展名的文件。
+    Search for all files with the specified extension(s) in the given folder and its subfolders.
 
-    参数:
-    folder_path (str): 要搜索的文件夹路径。
-    extensions (str): 要搜索的文件扩展名，以点开头（例如 '.ply'）。
+    Args:
+    folder_path (str): Path to the folder where the search will be performed.
+    ext (str or list of str): File extension(s) to search for, starting with a dot (e.g., '.ply').
 
-    返回:
-    list: 找到的所有指定扩展名文件的路径列表。
+    Returns:
+    list: A list of file paths (in POSIX format) matching the specified extension(s).
     """
-    files_with_extension = []
-    
+    file_path_list_with_extension = []
+
+    # Ensure 'ext' is a list
     if isinstance(ext, str):
         ext = [ext]
-    
-    # 使用 Path 对象遍历文件夹
+
+    ext_set = {e.lower() for e in ext}
+
     folder_path = Path(folder_path)
+
+    # Traverse all files recursively
+    for file_path in folder_path.rglob('*'):
+        if file_path.is_file() and file_path.suffix.lower() in ext_set:
+            file_path_list_with_extension.append(file_path.as_posix())
     
-    # if ext is str, then convert to list
-    if isinstance(ext, str):
-        ext = [ext]
-    
-    # 遍历文件夹中的所有文件
-    for file_path in folder_path.rglob('*'):  # rglob('*') 遍历所有子文件夹
-        if file_path.is_file() and any(file_path.suffix.lower() == e.lower() for e in ext):
-            # 使用 .as_posix() 转换为正斜杠格式
-            files_with_extension.append(file_path.as_posix())
-    
-    return files_with_extension
+    return file_path_list_with_extension
 
 def get_parent_directory(file_path):
     # 获取当前目录
