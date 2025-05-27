@@ -8,6 +8,7 @@ from qixuema.o3d_utils import get_vertices_obb
 import open3d as o3d
 import logging
 from scipy.interpolate import splprep, splev, interp1d
+from scipy.ndimage import gaussian_filter1d
 
 logger = logging.getLogger(__name__)
 
@@ -1342,3 +1343,11 @@ def fit_bspline(points, n_samples=64, degree=3, smoothing=0.0, arc_length=False,
     samples = np.vstack(splev(u_new, tck)).T
     return samples
 
+def gaussian_smooth_curve(points, sigma=1.0):
+    points = np.array(points)
+    points_smoothed = gaussian_filter1d(points.astype(np.float32), sigma=sigma, axis=-2)
+    
+    # set the first and last points to be the same as the original points
+    points_smoothed[...,0,:] = points[...,0,:]
+    points_smoothed[..., -1,:] = points[..., -1,:]
+    return points_smoothed
