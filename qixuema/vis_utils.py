@@ -84,24 +84,3 @@ def vis_lineset(data):
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5, origin=[0, 0, 0])
 
     o3d.visualization.draw_geometries([line_set, pcd, coordinate_frame])
-
-
-
-
-def test_polylines_to_png():
-    npz_file_path = 'C:/studio/Datasets/ABC/wireset/dataset/CurveWiframe/curve_wireframe/009/0094/00944567.npz' 
-    sample = np.load(npz_file_path)
-    edge_points = sample['edge_points']
-    print(edge_points.shape)
-    
-    save_path = 'C:/studio/Datasets/ABC/wireset/dataset/CurveWiframe/tmp/00944567.png'
-
-    polylines_to_png(edge_points, save_path, dpi=150)
-    print(f"Saved to {save_path}")
-
-
-
-
-if __name__ == '__main__':
-    test_polylines_to_png()
-
