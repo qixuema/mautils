@@ -2,12 +2,12 @@ import numpy as np
 from einops import rearrange, repeat
 from typing import Optional
 import heapq
-from scipy.interpolate import interp1d
 from deprecated import deprecated
 from qixuema.helpers import check_nan_inf
 from qixuema.o3d_utils import get_vertices_obb
 import open3d as o3d
 import logging
+from scipy.interpolate import splprep, splev, interp1d
 
 logger = logging.getLogger(__name__)
 
@@ -15,36 +15,6 @@ START_END = np.array(
     [[0.0, 0.0, 0.0], 
     [0.54020254, -0.77711392, 0.32291667]]
 )
-
-def vis_lineset(data):
-    if isinstance(data, dict):
-        lineset = data
-    else:
-        shape = data.shape
-        # 判断形状是否为 nx2x3
-        if len(shape) == 3 and shape[1] == 2 and shape[2] == 3:
-            print("数组的形状是 nx2x3")
-        else:
-            print("数组的形状不是 nx2x3")
-            return
-        
-        vertices = data.reshape(-1, 3)
-        lines = np.arange(len(vertices)).reshape(-1, 2)
-        lineset = {'vertices': vertices, 'lines': lines}
-
-    lineset['vertices'] = lineset['vertices'].astype(np.float32)
-    lineset['lines'] = lineset['lines'].astype(np.int32)
-
-    line_set = o3d.geometry.LineSet()
-    line_set.points = o3d.utility.Vector3dVector(lineset['vertices'])
-    line_set.lines = o3d.utility.Vector2iVector(lineset['lines'])
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(lineset['vertices'])
-
-    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5, origin=[0, 0, 0])
-
-
-    o3d.visualization.draw_geometries([line_set, pcd, coordinate_frame])
 
 
 def discretize(t, *, continuous_range=(-1,1), num_discrete=128):
@@ -1150,60 +1120,38 @@ def calculate_polyline_lengths_single_batch(points: np.ndarray) -> np.ndarray:
     return polyline_lengths
 
 
-def normalize_edges_points(edge_points, uid=None, is_check_order=False, handleCollinear=True, check_bbox=False):
-
+def normalize_edges_points(edge_points, handleCollinear=True, check_bbox=False):
     if check_nan_inf(edge_points):
-        print(f'{uid} contains nan or inf')
         return None
-
-    start_points = edge_points[:, 0, :]
-    end_points = edge_points[:, -1, :]
-
-    if is_check_order:
-        mask = ~ check_order(start_points, end_points)
-        if np.any(mask):
-            print(f'{uid} has wrong order') # double check
-            return None
 
     new_edge_points = np.zeros_like(edge_points)
 
     for i, edge_points_i in enumerate(edge_points):
         norm_edge_points_i = transform_polyline(edge_points_i, handleCollinear=handleCollinear)
         if check_nan_inf(norm_edge_points_i):
-            print(f'{uid} contains nan or inf')
-            # vis_lineset({'vertices': edge_points_i, 'lines': [[i, i + 1] for i in range(len(edge_points_i) - 1)]})
             return None
         
         if check_bbox:
-
             center, extent, R = get_vertices_obb(norm_edge_points_i)
             min_extent = np.min(extent)
 
-            if min_extent > 0.7: # 这是一个 绝对值
-                print(f'{uid} has non-unit bbox', min_extent) # 主要是排除掉哪些特别扭曲的线，这些线可能会导致训练不稳定
-                # vis_lineset({'vertices': edge_points_i, 'lines': np.array([[i, i + 1] for i in range(len(edge_points_i) - 1)])})
-                # vis_lineset({'vertices': norm_edge_points_i, 'lines': np.array([[i, i + 1] for i in range(len(norm_edge_points_i) - 1)])})
-                # lengths = calculate_polyline_lengths_single_batch(norm_edge_points_i[np.newaxis])
+            if min_extent > 0.7:
                 return None
 
         new_edge_points[i] = norm_edge_points_i
 
 
     if check_nan_inf(new_edge_points):
-        print(f'{uid} contains nan or inf')
         return None
 
     return new_edge_points
 
 
-def transform_multi_edges_points(edge_points, start_end=None, uid=None, is_check_order=False, handleCollinear=True, check_bbox=False):
+def transform_multi_edges_points(edge_points, start_end=None, handleCollinear=True, check_bbox=False):
     if start_end is None:
-        return normalize_edges_points(edge_points, uid, is_check_order)
+        return normalize_edges_points(edge_points, handleCollinear, check_bbox)
     
-
-
     if check_nan_inf(edge_points):
-        print(f'{uid} contains nan or inf')
         return None
 
     new_edge_points = np.zeros_like(edge_points)
@@ -1215,14 +1163,12 @@ def transform_multi_edges_points(edge_points, start_end=None, uid=None, is_check
             return None
         
         if check_nan_inf(new_edge_points_i):
-            print(f'{uid} contains nan or inf')
             return None
 
         new_edge_points[i] = new_edge_points_i
 
 
     if check_nan_inf(new_edge_points):
-        print(f'{uid} contains nan or inf')
         return None
 
     return new_edge_points
@@ -1235,9 +1181,9 @@ def normalize_edge_points_two_stage(edge_points, check_bbox=False):
     edge_points_middle_status = transform_multi_edges_points(edge_points, tgt_start_ends, handleCollinear=False)
     if edge_points_middle_status is None:
         return None
-    
+
     norm_edge_points = normalize_edges_points(edge_points_middle_status, handleCollinear=False, check_bbox=check_bbox)
-    
+
     if norm_edge_points is None:
         return None
     
@@ -1369,15 +1315,40 @@ def sample_points_from_mesh(mesh, num_samples=10000):
     return {'points': points, 'normals': normals}
 
 
-# # 测试接口
-# if __name__ == "__main__":
-#     points = np.array([
-#         [1, 2, 3],
-#         [4, 5, 6],
-#         [7, 8, 9]
-#         # 更多点...
-#     ])
-    
-#     translated_points = translate_to_origin(points)
-#     print("平移后的点集：")
-#     print(translated_points)
+def fit_bspline(points, n_samples=64, degree=3, smoothing=0.0, arc_length=False, fine_factor=10):
+    """
+    use scipy.interpolate.splprep to fit bspline and sample points
+
+    Args:
+    - points: (N,3) ndarray, input points
+    - n_samples: int, number of output samples (including start and end)
+    - degree: int, degree of the bspline, default 3
+    - smoothing: float, smoothing factor s, 0 means interpolation
+    - arc_length: bool, whether to sample points by arc length
+    - fine_factor: int, when arc_length=True, the subdivision factor (N*fine_factor)
+
+    Returns:
+    - samples: (n_samples,3) ndarray, sampled points
+    """
+    # 1) fit bspline
+    #   directly pass points.T to splprep, so we don't need to split x,y,z
+    tck, _ = splprep(points.T, s=smoothing, k=degree)
+
+    # 2) generate parameter u
+    if arc_length:
+        # pre-sample on denser u to estimate cumulative arc length
+        N = len(points)
+        u_fine = np.linspace(0, 1, N * fine_factor)
+        coords = np.vstack(splev(u_fine, tck)).T
+        seg = np.linalg.norm(np.diff(coords, axis=0), axis=1)
+        cumlen = np.concatenate(([0], np.cumsum(seg)))
+        # back-interpolate to u_new by equal arc length
+        u_new = np.interp(np.linspace(0, cumlen[-1], n_samples), cumlen, u_fine)
+    else:
+        # parameter domain equidistant
+        u_new = np.linspace(0, 1, n_samples)
+
+    # 3) generate final sampled points
+    samples = np.vstack(splev(u_new, tck)).T
+    return samples
+
