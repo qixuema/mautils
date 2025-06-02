@@ -5,6 +5,7 @@ import heapq
 from deprecated import deprecated
 from qixuema.helpers import check_nan_inf
 from qixuema.o3d_utils import get_vertices_obb
+from qixuema.np_utils import safe_norm
 import open3d as o3d
 import logging
 from scipy.interpolate import splprep, splev, interp1d
@@ -23,12 +24,6 @@ START_END_R = np.array([
     [-0.32291649,  0.1629285 ,  0.93229779]
 ])
 
-
-def safe_norm(v: np.ndarray, eps: float) -> np.ndarray:
-    """
-    Compute the L2 norm of `v` along the last axis and clamp it to be at least `eps`.
-    """
-    return np.maximum(np.linalg.norm(v, axis=-1, keepdims=True), eps)
 
 def discretize(t, *, continuous_range=(-1,1), num_discrete=128):
     lo, hi = continuous_range

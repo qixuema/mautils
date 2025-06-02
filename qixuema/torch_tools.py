@@ -2,6 +2,10 @@ import torch
 from einops import repeat, rearrange
 from torchtyping import TensorType
 
+def safe_norm(x: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    norm = torch.linalg.vector_norm(x, dim=-1, keepdim=True)
+    return norm.clamp(min=eps)
+
 
 def interpolate_1d(
     t: TensorType["bs", "n"],
