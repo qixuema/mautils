@@ -3,7 +3,7 @@ from einops import rearrange, repeat
 from typing import Optional
 import heapq
 from deprecated import deprecated
-from qixuema.helpers import check_nan_inf
+from qixuema.np_utils import check_nan_inf
 from qixuema.o3d_utils import get_vertices_obb
 from qixuema.np_utils import safe_norm
 import open3d as o3d

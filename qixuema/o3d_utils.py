@@ -47,3 +47,34 @@ def get_vertices_obb(vertices, noise_scale=1e-4):
     obb = point_cloud.get_oriented_bounding_box()
 
     return obb.center, obb.extent, obb.R
+
+
+
+def vis_lineset(data):
+    if isinstance(data, dict):
+        lineset = data
+    else:
+        shape = data.shape
+        # 
+        if len(shape) == 3 and shape[1] == 2 and shape[2] == 3:
+            print("数组的形状是 nx2x3")
+        else:
+            print("数组的形状不是 nx2x3")
+            return
+        
+        vertices = data.reshape(-1, 3)
+        lines = np.arange(len(vertices)).reshape(-1, 2)
+        lineset = {'vertices': vertices, 'lines': lines}
+
+    lineset['vertices'] = lineset['vertices'].astype(np.float32)
+    lineset['lines'] = lineset['lines'].astype(np.int32)
+
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(lineset['vertices'])
+    line_set.lines = o3d.utility.Vector2iVector(lineset['lines'])
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(lineset['vertices'])
+
+    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5, origin=[0, 0, 0])
+
+    o3d.visualization.draw_geometries([line_set, pcd, coordinate_frame])

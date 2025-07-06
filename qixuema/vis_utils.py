@@ -1,8 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.ticker import MaxNLocator
-import open3d as o3d
 
 def polylines_to_png(
     polylines, 
@@ -55,32 +53,3 @@ def polylines_to_png(
     # plt.tight_layout()
     fig.savefig(filename, dpi=dpi)
     plt.close(fig)
-
-def vis_lineset(data):
-    if isinstance(data, dict):
-        lineset = data
-    else:
-        shape = data.shape
-        # 
-        if len(shape) == 3 and shape[1] == 2 and shape[2] == 3:
-            print("数组的形状是 nx2x3")
-        else:
-            print("数组的形状不是 nx2x3")
-            return
-        
-        vertices = data.reshape(-1, 3)
-        lines = np.arange(len(vertices)).reshape(-1, 2)
-        lineset = {'vertices': vertices, 'lines': lines}
-
-    lineset['vertices'] = lineset['vertices'].astype(np.float32)
-    lineset['lines'] = lineset['lines'].astype(np.int32)
-
-    line_set = o3d.geometry.LineSet()
-    line_set.points = o3d.utility.Vector3dVector(lineset['vertices'])
-    line_set.lines = o3d.utility.Vector2iVector(lineset['lines'])
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(lineset['vertices'])
-
-    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5, origin=[0, 0, 0])
-
-    o3d.visualization.draw_geometries([line_set, pcd, coordinate_frame])
