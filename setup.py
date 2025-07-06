@@ -3,9 +3,9 @@ from setuptools import setup, find_packages
 setup(
   name = 'qixuema',
   # packages = find_packages(exclude=['examples']),
-  version = '0.0.3',
+  version = '0.0.4',
   license='MIT',
-  description = 'qixuema-utils - Pytorch',
+  description = 'qixuema utils',
   author = 'Xueqi Ma',
   author_email = 'qixuemaa@gmail.com',
   url = 'https://https://github.com/qixuema/m-utils',
@@ -20,7 +20,7 @@ setup(
     'packaging>=21.0',
     'open3d>=0.19.0',
     'deprecated>=1.2.18',
-    'numpy>=1.26.0',
+    'numpy==1.26.0',
     'pyyaml>=6.0.1',
   ],
   setup_requires=[
