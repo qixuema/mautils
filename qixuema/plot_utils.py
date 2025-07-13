@@ -3,6 +3,7 @@ from collections import Counter
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 def plot_frequency_distribution(
     data: Sequence[Union[int, float]],
@@ -82,6 +83,10 @@ def plot_frequency_distribution(
     ax.set_title(title or ("Frequency Distribution" if not relative else "Relative Frequency Distribution"))
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    
+    if not relative:
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
     if show_grid:
         ax.grid(True, linestyle='--', alpha=0.5)
 
