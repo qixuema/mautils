@@ -302,3 +302,9 @@ def timeit(func):
         print(f"{func.__name__} took {elapsed:.4f}s")
         return result
     return wrapper
+
+def generate_random_string(length, batch_size=1):
+    chars = string.ascii_letters + string.digits
+    pool = random.choices(chars, k=length * batch_size)
+
+    return [''.join(pool[i*length:(i+1)*length]) for i in range(batch_size)]
