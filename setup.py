@@ -18,7 +18,6 @@ setup(
     'einx>=0.3.0',
     'einops>=0.8.0',
     'packaging>=21.0',
-    'open3d>=0.18.0',
     'deprecated>=1.2.14',
     'numpy==1.26.0',
     'pyyaml>=6.0.1',
