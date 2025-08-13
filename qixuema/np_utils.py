@@ -7,7 +7,6 @@ def check_nan_inf(data):
         return True
     return False
 
-
 def is_close(a, b, atol=1e-5):
     return np.isclose(a, b, atol=atol)
 
@@ -119,3 +118,10 @@ def interpolate_1d_batch(
     interpolated = (1 - alpha) * left_values + alpha * right_values
 
     return interpolated
+
+def normalize_vertices(vertices, scale=1.0):
+    bbmin, bbmax = vertices.min(0), vertices.max(0)
+    center = (bbmin + bbmax) * 0.5
+    scale = 2.0 * scale / (bbmax - bbmin).max()
+    vertices = (vertices - center) * scale
+    return vertices, center, scale
