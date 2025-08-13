@@ -22,5 +22,4 @@ twine check dist/*
 twine upload dist/*
 
 # Upgrade and install the package
-pip install --upgrade qixuema
-
+pip install --upgrade qixuema -i https://pypi.org/simple
