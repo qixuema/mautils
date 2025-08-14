@@ -38,3 +38,8 @@ twine upload dist/*
 ```
 pip install --upgrade qixuema -i https://pypi.org/simple
 ```
+
+## install on local
+```
+python -m pip install -e . 
+```
