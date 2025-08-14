@@ -126,6 +126,18 @@ def normalize_vertices(vertices, scale=1.0):
     return vertices, center, scale
 
 
+def deduplicate_lines(lines):
+    """
+    deduplicate lines, return unique lines without change line direction
+    lines: (N,2) int
+    """
+    
+    sorted_lines = np.sort(lines, axis=1) # inner sort
+    _, indices = np.unique(sorted_lines, axis=0, return_index=True)
+    unique_lines = lines[np.sort(indices)]
+    
+    return unique_lines
+
 def deduplicate_faces(faces, faces_uv=None):
     """
     deduplicate faces by xyz, return unique faces without change face normal
