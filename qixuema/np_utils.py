@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def check_nan_inf(data):
     contains_nan_inf = np.any(np.isnan(data)) or np.any(np.isinf(data))
     if contains_nan_inf:
@@ -142,3 +141,18 @@ def deduplicate_faces(faces, faces_uv=None):
     
     return faces_unique
 
+def clean_invalid_faces(faces):
+    """
+    remove invalid faces, return valid faces indices
+    faces: (N,3) int
+    """
+    f0, f1, f2 = faces[:, 0], faces[:, 1], faces[:, 2]
+    invalid = (f0 == f1) | (f0 == f2) | (f1 == f2)
+    return faces[~invalid]
+
+def clean_invalid_lines(lines):
+    """
+    remove invalid lines, return valid lines indices
+    lines: (N,2) int
+    """
+    return lines[lines[:, 0] != lines[:, 1]]
