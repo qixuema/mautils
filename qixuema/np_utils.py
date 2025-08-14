@@ -168,3 +168,38 @@ def clean_invalid_lines(lines):
     lines: (N,2) int
     """
     return lines[lines[:, 0] != lines[:, 1]]
+
+
+def discretize(
+    t,
+    n_bits = 8,
+    continuous_range = (-1, 1),
+):
+    lo, hi = continuous_range
+    assert hi > lo
+    
+    num_discrete = 2 ** n_bits
+    
+    t = (t - lo) / (hi - lo)
+    t *= num_discrete
+    t -= 0.5
+
+    return t.round().astype(np.int32).clip(min = 0, max = num_discrete - 1)
+
+
+def undiscretize(
+    t,
+    *,
+    n_bits = 8,
+    continuous_range = (-1, 1),
+) :
+    lo, hi = continuous_range
+    assert hi > lo
+
+    num_discrete = 2 ** n_bits
+
+    t = t.astype(np.float32)
+
+    t += 0.5
+    t /= num_discrete
+    return t * (hi - lo) + lo

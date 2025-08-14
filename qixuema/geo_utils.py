@@ -25,30 +25,6 @@ START_END_R = np.array([
 ])
 
 
-def discretize(t, *, continuous_range=(-1,1), num_discrete=128):
-    lo, hi = continuous_range
-    assert hi > lo, "Upper bound must be greater than lower bound."
-
-    t = (t - lo) / (hi - lo)
-    t *= num_discrete
-    t -= 0.5
-
-    # Convert to discrete values, enforce data type, and clamp the values
-    t = np.round(t).astype(int)
-    t = np.clip(t, 0, num_discrete - 1)
-    
-    return t
-
-def undiscretize(t, continuous_range=(-1,1), num_discrete=128):
-    lo, hi = continuous_range
-    assert hi > lo
-
-    t = t.astype(np.float32)  # 确保t为浮点数类型
-
-    t += 0.5
-    t /= num_discrete
-    return t * (hi - lo) + lo
-
 def calculate_cosine_with_z_axis(vertex1, vertex2, vertex3):
     """
     计算由三个顶点定义的平面的法线向量与Z轴的重合度（即夹角的余弦值）。
