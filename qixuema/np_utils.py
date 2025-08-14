@@ -125,3 +125,20 @@ def normalize_vertices(vertices, scale=1.0):
     scale = 2.0 * scale / (bbmax - bbmin).max()
     vertices = (vertices - center) * scale
     return vertices, center, scale
+
+
+def deduplicate_faces(faces, faces_uv=None):
+    """
+    deduplicate faces by xyz, return unique faces without change face normal
+    """
+    sorted_faces = np.sort(faces, axis=1)
+    _, indices = np.unique(sorted_faces, axis=0, return_index=True)
+    keep_idx = np.sort(indices)
+    faces_unique = faces[keep_idx]
+
+    if faces_uv is not None:
+        faces_uv_unique = faces_uv[keep_idx]
+        return faces_unique, faces_uv_unique
+    
+    return faces_unique
+
