@@ -203,3 +203,34 @@ def undiscretize(
     t += 0.5
     t /= num_discrete
     return t * (hi - lo) + lo
+
+
+def rotation_matrix_x(theta):
+    theta_rad = np.radians(theta)
+    cos_t = np.cos(theta_rad)
+    sin_t = np.sin(theta_rad)
+    return np.array([
+        [1, 0, 0],
+        [0, cos_t, -sin_t],
+        [0, sin_t, cos_t]
+    ])
+
+def rotation_matrix_y(theta):
+    theta_rad = np.radians(theta)
+    cos_t = np.cos(theta_rad)
+    sin_t = np.sin(theta_rad)
+    return np.array([
+        [cos_t, 0, sin_t],
+        [0, 1, 0],
+        [-sin_t, 0, cos_t]
+    ])
+
+def rotation_matrix_z(theta):
+    theta_rad = np.radians(theta)
+    cos_t = np.cos(theta_rad)
+    sin_t = np.sin(theta_rad)
+    return np.array([
+        [cos_t, -sin_t, 0],
+        [sin_t, cos_t, 0],
+        [0, 0, 1]
+    ])
