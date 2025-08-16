@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Iterable, Tuple, Optional, Union
 
 def check_nan_inf(data):
     contains_nan_inf = np.any(np.isnan(data)) or np.any(np.isinf(data))
@@ -234,3 +235,92 @@ def rotation_matrix_z(theta):
         [sin_t, cos_t, 0],
         [0, 0, 1]
     ])
+
+def pad_sequences(
+    sequences: Iterable[np.ndarray],
+    maxlen: Optional[int] = None,
+    dtype: Optional[np.dtype] = None,
+    pad_value: Union[int, float] = 0,
+    padding: str = "post",       # "post" 左对齐（在尾部补），"pre" 右对齐（在头部补）
+    truncating: str = "post",    # 超过 maxlen 时从哪边截断："post" 前段保留，"pre" 后段保留
+    return_lengths: bool = False
+) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    """
+    将不等长序列 padding 成 (N, M, *feat_shape) 的规则数组。
+
+    Args:
+        sequences: 可迭代的数组，每个元素形状为 (Ti, *feat_shape)；标量会视为 Ti=1。
+        maxlen: 目标长度 M；若为 None，则取所有 Ti 的最大值。
+        dtype: 结果 dtype；默认根据 pad_value 与各序列 dtype 推断。
+        pad_value: 补齐用的值。
+        padding: "post" 或 "pre"（补在尾部/头部）。
+        truncating: 当 Ti > M 时从 "post"（尾部截掉）或 "pre"（头部截掉）。
+        return_lengths: 是否返回每条序列真实放入的长度（min(Ti, M)）。
+
+    Returns:
+        padded: 形状 (N, M, *feat_shape) 的数组。
+        lengths (可选): 形状 (N,) 的实际长度。
+    """
+    seqs = [np.asarray(s) for s in sequences]
+    N = len(seqs)
+    if N == 0:
+        out = np.empty((0, 0), dtype=(dtype or np.asarray(pad_value).dtype))
+        return (out, np.empty((0,), dtype=int)) if return_lengths else out
+
+    # 统一特征维（length 维是轴 0），标量当作长度为 1 的序列
+    def seq_len_and_tail(s: np.ndarray):
+        if s.ndim == 0:
+            return 1, ()
+        return s.shape[0], s.shape[1:]
+
+    # 决定 feat_shape，并校验一致性
+    tail_shape = None
+    lengths_raw = []
+    for s in seqs:
+        L, tail = seq_len_and_tail(s)
+        lengths_raw.append(L)
+        if tail_shape is None:
+            tail_shape = tail
+        elif tail_shape != tail:
+            raise ValueError(f"All sequences must share the same feature shape after axis 0. "
+                             f"Got {tail_shape} vs {tail}.")
+
+    lengths_raw = np.asarray(lengths_raw, dtype=int)
+    if maxlen is None:
+        maxlen = int(lengths_raw.max())
+
+    # 推断 dtype
+    if dtype is None:
+        dtype = np.result_type(pad_value, *[s.dtype for s in seqs])
+
+    # 预分配输出
+    out = np.full((N, maxlen, *tail_shape), pad_value, dtype=dtype)
+    used_lengths = np.minimum(lengths_raw, maxlen)
+
+    # 填充
+    for i, s in enumerate(seqs):
+        # 标量视作 (1, *tail_shape)
+        if s.ndim == 0:
+            s = s.reshape(1, *tail_shape)
+
+        L = used_lengths[i]
+        if L == 0:
+            continue
+
+        # 截断
+        if truncating == "post":
+            s_trunc = s[:L]
+        elif truncating == "pre":
+            s_trunc = s[-L:]
+        else:
+            raise ValueError("truncating must be 'post' or 'pre'")
+
+        # 放置
+        if padding == "post":
+            out[i, :L] = s_trunc
+        elif padding == "pre":
+            out[i, -L:] = s_trunc
+        else:
+            raise ValueError("padding must be 'post' or 'pre'")
+
+    return (out, used_lengths) if return_lengths else out
