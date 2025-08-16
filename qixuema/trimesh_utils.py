@@ -34,7 +34,7 @@ def create_colored_prism_segment(s_p, e_p, radius=0.1, color=(1,0,0), n_sides=5)
     return mesh
 
 def segments_to_prisms(segments, base_mesh=None, radius=0.01, n_sides=5,
-                       random_colors=True, default_color=(1,0,0)):
+                       random_colors=False, color=(1,0,0)):
     """
     将 segments 转换为棱柱 mesh，并可选与 base_mesh 合并。
 
@@ -58,8 +58,8 @@ def segments_to_prisms(segments, base_mesh=None, radius=0.01, n_sides=5,
     # 每个 segment 生成一个棱柱
     for seg in segments:
         s_p, e_p = seg
-        color = np.random.rand(3) if random_colors else default_color
-        prism = create_colored_prism_segment(s_p, e_p, radius=radius, color=color, n_sides=n_sides)
+        chain_color = np.random.rand(3) if random_colors else color
+        prism = create_colored_prism_segment(s_p, e_p, radius=radius, color=chain_color, n_sides=n_sides)
         if prism is not None:
             meshes.append(prism)
 
