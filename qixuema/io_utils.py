@@ -96,10 +96,26 @@ def load_yaml(config_path="config.yaml"):
         return yaml.safe_load(file)
             
 
+def save_obj_with_uv(output_path, xyz, uvs, faces_xyz, faces_uv):
+    with open(output_path, 'w') as file:
+        for vertex in xyz:
+            file.write(f"v {' '.join(map(str, vertex))}\n")
+        
+        for uv in uvs:
+            file.write(f"vt {' '.join(map(str, uv))}\n")
+        
+        for face_v, face_vt in zip(faces_xyz, faces_uv):
+            face_line = ' '.join(
+                [f"{int(face_v[j]) + 1}/{int(face_vt[j]) + 1}" for j in range(3)]
+            )
+            file.write(f"f {face_line}\n")
+
+
 if __name__=="__main__":
     # Example usage
     vertices = [(1, 2, 3), (4, 5, 6), (7, 8, 9)]
     faces = [(1, 2, 3)]
     write_obj_file('example.obj', vertices, faces)
+
 
 
