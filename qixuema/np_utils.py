@@ -236,7 +236,7 @@ def rotation_matrix_z(theta):
         [0, 0, 1]
     ])
 
-def pad_sequences(
+def pad_sequence_np(
     sequences: Iterable[np.ndarray],
     maxlen: Optional[int] = None,
     dtype: Optional[np.dtype] = None,
