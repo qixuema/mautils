@@ -80,7 +80,6 @@ def polyline_to_prism(
     *,
     n_sides: int = 5,
     radius: float = 0.01,
-    base_mesh: trimesh.Trimesh | None = None,
     color: tuple[float, float, float] = (1, 0, 0),
     end_caps: bool = False
 ) -> trimesh.Trimesh:
@@ -108,6 +107,18 @@ def polyline_to_prism(
     rgba = (np.clip(np.array(color + (1.0,)), 0, 1) * 255).astype(np.uint8)
     mesh.visual.vertex_colors = np.tile(rgba, (len(mesh.vertices), 1))
 
-    if base_mesh is not None:
-        mesh = trimesh.util.concatenate([base_mesh, mesh])
+    return mesh
+
+def polylines_to_mesh(polylines, radius=0.1):
+    meshes = []
+    
+    for i, polyline in enumerate(polylines):
+        color = np.random.rand(3)
+        
+        prism =  polyline_to_prism(polyline, color=color, radius=radius, n_sides=5)
+        
+        meshes.append(prism)
+        
+    mesh = trimesh.util.concatenate(meshes)
+    
     return mesh
