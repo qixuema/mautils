@@ -48,7 +48,7 @@ def is_debug():
 
 
 
-def get_file_list_with_extension(folder_path, ext):
+def find_files_by_ext(folder_path, exts):
     """
     Search for all files with the specified extension(s) in the given folder and its subfolders.
 
@@ -62,16 +62,26 @@ def get_file_list_with_extension(folder_path, ext):
     file_path_list_with_extension = []
 
     # Ensure 'ext' is a list
-    if isinstance(ext, str):
-        ext = [ext]
+    if isinstance(exts, str):
+        exts = [exts]
+    else:
+        exts = list(exts)        
 
-    ext_set = {e.lower() for e in ext}
+    norm_exts = []
+    for e in exts:
+        if not e:
+            continue
+        e = e if e.startswith('.') else f'.{e}'
+        norm_exts.append(e.lower())
 
     folder_path = Path(folder_path)
 
+    if not folder_path.is_dir():
+        raise NotADirectoryError(f"{folder_path!r} is not a directory")
+
     # Traverse all files recursively
     for file_path in folder_path.rglob('*'):
-        if file_path.is_file() and file_path.suffix.lower() in ext_set:
+        if file_path.is_file() and file_path.suffix.lower() in norm_exts:
             file_path_list_with_extension.append(file_path.as_posix())
     
     return file_path_list_with_extension
@@ -281,7 +291,7 @@ def get_or_create_file_list_json(dataset_dir_path, json_path, extension='.npz'):
     """
 
     if not os.path.exists(json_path):
-        file_list = get_file_list_with_extension(dataset_dir_path, extension)
+        file_list = find_files_by_ext(dataset_dir_path, extension)
         with open(json_path, 'w') as f:
             json.dump(file_list, f)
     else:
