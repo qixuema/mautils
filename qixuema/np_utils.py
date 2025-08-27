@@ -122,7 +122,12 @@ def interpolate_1d_batch(
 def normalize_vertices(vertices, scale=1.0):
     bbmin, bbmax = vertices.min(0), vertices.max(0)
     center = (bbmin + bbmax) * 0.5
-    scale = 2.0 * scale / (bbmax - bbmin).max()
+    denom = (bbmax - bbmin).max()
+
+    if denom <= 1e-6:
+        raise ValueError(f"Degenerate bounding box: bbmin={bbmin}, bbmax={bbmax}, denom={denom}")
+    
+    scale = 2.0 * scale / denom
     vertices = (vertices - center) * scale
     return vertices, center, scale
 
