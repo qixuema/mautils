@@ -81,7 +81,7 @@ def polyline_to_prism(
     n_sides: int = 5,
     radius: float = 0.01,
     color: tuple[float, float, float] = (1, 0, 0),
-    end_caps: bool = False
+    end_caps: bool = True,
 ) -> trimesh.Trimesh:
     """
     沿 3D polyline 扫掠一个正 N 边形截面，生成连续棱柱（默认五棱柱）。
@@ -90,7 +90,6 @@ def polyline_to_prism(
         polyline: (M,3) 采样点 (至少2个)。
         n_sides:  截面边数（=5 即五棱柱）。
         radius:   截面外接圆半径。
-        base_mesh: 若给出，则把结果与其 concatenate。
         color:    顶点颜色 RGB [0,1]。
         end_caps: 是否封住首尾 (默认 False).
     """
@@ -109,13 +108,18 @@ def polyline_to_prism(
 
     return mesh
 
-def polylines_to_mesh(polylines, radius=0.1):
+def polylines_to_mesh(polylines, radius=0.1, n_sides=5):
+    """
+    Args:
+        polylines: List[Array(M,3)] 采样点。
+        radius:   截面外接圆半径。
+    """
     meshes = []
     
-    for i, polyline in enumerate(polylines):
+    for polyline in polylines:
         color = np.random.rand(3)
         
-        prism =  polyline_to_prism(polyline, color=color, radius=radius, n_sides=5)
+        prism =  polyline_to_prism(polyline, color=color, radius=radius, n_sides=n_sides)
         
         meshes.append(prism)
         
