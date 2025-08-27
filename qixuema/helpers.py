@@ -8,6 +8,8 @@ import datetime
 import json
 import time
 import functools
+from typing import Union, Sequence, Iterable
+import random
 
 def first(it):
     return it[0]
@@ -319,3 +321,41 @@ def generate_random_string(length, batch_size=1):
     pool = random.choices(chars, k=length * batch_size)
 
     return [''.join(pool[i*length:(i+1)*length]) for i in range(batch_size)]
+
+
+def iter_files_with_ext(
+    root: Union[str, os.PathLike],
+    exts: Union[str, Sequence[str]] = ".npz",
+    max_num: int = None
+) -> Iterable[str]:
+    """
+    高效递归列出指定扩展名文件（生成器，按需产出，支持早停）
+    """
+    if isinstance(exts, (str, bytes)):
+        exts = (exts,)
+    # 统一成 .ext 小写
+    exts = tuple(e if e.startswith('.') else '.'+e for e in exts)
+    exts = tuple(e.lower() for e in exts)
+
+    stack = [os.fspath(root)]
+    emitted = 0
+
+    while stack:
+        d = stack.pop()
+        try:
+            with os.scandir(d) as it:
+                for entry in it:
+                    if entry.is_dir(follow_symlinks=False):
+                        stack.append(entry.path)
+                    elif entry.is_file(follow_symlinks=False):
+                        # 比 Path.suffix 更省开销
+                        name = entry.name
+                        if name.lower().endswith(exts):
+                            yield entry.path
+                            emitted += 1
+                            if max_num is not None and emitted >= max_num:
+                                return
+        except (PermissionError, FileNotFoundError):
+            # 跳过无权限或瞬时消失的目录
+            continue
+
