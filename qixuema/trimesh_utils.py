@@ -36,13 +36,13 @@ def create_colored_prism_segment(s_p, e_p, radius=0.1, color=(1,0,0), n_sides=5)
 def segments_to_prisms(segments, base_mesh=None, radius=0.01, n_sides=5,
                        random_colors=False, color=(1,0,0)):
     """
-    将 segments 转换为棱柱 mesh，并可选与 base_mesh 合并。
+    将 segments 转换为棱柱 mesh, 并可选与 base_mesh 合并.
 
     Args:
         segments: (N,2,3) 线段端点数组
-        base_mesh: trimesh.Trimesh 或 None（可选）
+        base_mesh: trimesh.Trimesh 或 None(可选)
         radius: 棱柱半径
-        n_sides: 棱柱边数（5=五棱柱）
+        n_sides: 棱柱边数 (5=五棱柱)
         random_colors: 是否随机颜色
         default_color: 非随机颜色时使用的 RGB (0~1)
 
@@ -67,3 +67,47 @@ def segments_to_prisms(segments, base_mesh=None, radius=0.01, n_sides=5,
         return None  # 没有任何 mesh
 
     return trimesh.util.concatenate(meshes)
+
+def _regular_ngon_2d(n_sides: int, radius: float, start_angle: float = 0.0) -> np.ndarray:
+    """在 XY 平面生成正 N 边形顶点 (N,2)。"""
+    angles = np.linspace(0.0 + start_angle, 2*np.pi + start_angle, n_sides, endpoint=False)
+    x = radius * np.cos(angles)
+    y = radius * np.sin(angles)
+    return np.column_stack([x, y])  # (N,2)
+
+def polyline_to_prism(
+    polyline: np.ndarray,
+    *,
+    n_sides: int = 5,
+    radius: float = 0.01,
+    base_mesh: trimesh.Trimesh | None = None,
+    color: tuple[float, float, float] = (1, 0, 0),
+    end_caps: bool = False
+) -> trimesh.Trimesh:
+    """
+    沿 3D polyline 扫掠一个正 N 边形截面，生成连续棱柱（默认五棱柱）。
+
+    Args:
+        polyline: (M,3) 采样点 (至少2个)。
+        n_sides:  截面边数（=5 即五棱柱）。
+        radius:   截面外接圆半径。
+        base_mesh: 若给出，则把结果与其 concatenate。
+        color:    顶点颜色 RGB [0,1]。
+        end_caps: 是否封住首尾 (默认 False).
+    """
+    polyline = np.asarray(polyline, dtype=float)
+    if polyline.ndim != 2 or polyline.shape[1] != 3 or len(polyline) < 2:
+        raise ValueError("polyline 需为 (M,3) 且 M>=2")
+
+    # 生成 2D 正 N 边形截面（XY 平面），交由 sweep_polygon 扫掠
+    polygon_2d = _regular_ngon_2d(n_sides=n_sides, radius=radius)
+
+    mesh = trimesh.creation.sweep_polygon(polygon_2d, path=polyline, cap=end_caps)
+
+    # 上色
+    rgba = (np.clip(np.array(color + (1.0,)), 0, 1) * 255).astype(np.uint8)
+    mesh.visual.vertex_colors = np.tile(rgba, (len(mesh.vertices), 1))
+
+    if base_mesh is not None:
+        mesh = trimesh.util.concatenate([base_mesh, mesh])
+    return mesh
