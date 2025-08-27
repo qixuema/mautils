@@ -95,15 +95,18 @@ def get_parent_directory(file_path):
     parent_directory = os.path.dirname(current_directory)
     return parent_directory
 
-def get_directory_path(file_path):
+def get_dir_path(file_path):
     # 返回文件所在的目录路径
     return os.path.dirname(file_path)
 
-def get_filename_wo_ext(file_path):
+def get_filename(file_path, with_ext=False):
     # 获取文件名和扩展名
     base_name = os.path.basename(file_path)
-    # 分割文件名和扩展名，并返回不带扩展名的文件名
-    return os.path.splitext(base_name)[0]
+    if with_ext:
+        return base_name
+    else:
+        # 分割文件名和扩展名，并返回不带扩展名的文件名
+        return os.path.splitext(base_name)[0]
 
 def get_file_list(dir_path, ext=None):
     file_path_list = [os.path.join(dir_path, i) for i in os.listdir(dir_path)]
