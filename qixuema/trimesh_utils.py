@@ -1,6 +1,7 @@
 import numpy as np
 import trimesh
 from trimesh.creation import cylinder
+from shapely.geometry import Polygon
 
 def _rgba255(color):
     """
@@ -99,6 +100,8 @@ def polyline_to_prism(
 
     # 生成 2D 正 N 边形截面（XY 平面），交由 sweep_polygon 扫掠
     polygon_2d = _regular_ngon_2d(n_sides=n_sides, radius=radius)
+    
+    polygon_2d = Polygon(polygon_2d)  # Convert numpy array to shapely Polygon
 
     mesh = trimesh.creation.sweep_polygon(polygon_2d, path=polyline, cap=end_caps)
 
