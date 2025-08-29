@@ -129,3 +129,84 @@ def polylines_to_mesh(polylines, radius=0.1, n_sides=5):
     mesh = trimesh.util.concatenate(meshes)
     
     return mesh
+
+def get_vertices_obb(
+    vertices: np.ndarray,
+    *,
+    jitter: float = 1e-6,
+    rng: np.random.Generator | int | None = None,
+    robust_fallback: bool = True,
+):
+    """
+    计算点集的有向包围盒 (OBB).
+
+    Args:
+        vertices: (N, 3) 点集。
+        jitter:   相对抖动幅度（相对于点云包围盒对角线），
+                  None 表示不抖动；仅在失败时（或退化）才使用回退。
+        rng:      随机源 (np.random.Generator 或 seed)，确保可复现。
+        robust_fallback:
+                  当 `oriented_bounds` 失败时，使用 PCA 回退。
+
+    Returns:
+        centroid: (3,) OBB 中心
+        extents:  (3,) OBB 尺寸 (沿盒子局部 x/y/z)
+        T:        (4,4) 齐次变换矩阵 (从 OBB 局部到世界)
+    """
+    V = np.asarray(vertices, dtype=np.float64)
+    if V.ndim != 2 or V.shape[1] != 3 or len(V) == 0:
+        raise ValueError("`vertices` 必须是形状 (N, 3), 且 N > 0")
+
+    # 清除异常值 (NaN/Inf)
+    if not np.isfinite(V).all():
+        V = V[np.all(np.isfinite(V), axis=1)]
+        if len(V) == 0:
+            raise ValueError("所有点都包含 NaN/Inf")
+
+    def obb_by_trimesh(points: np.ndarray):
+        T, extents = trimesh.bounds.oriented_bounds(points)  # 轻量且快
+        centroid = T[:3, 3]
+        return centroid, extents, T
+
+    # 首次尝试：不加噪声，直接计算
+    try:
+        return obb_by_trimesh(V)
+    except Exception:
+        pass  # 可能是退化/奇异，下面尝试回退
+
+    # 可选：相对尺度的轻微抖动（可复现）
+    if jitter is not None and jitter > 0:
+        if not isinstance(rng, np.random.Generator):
+            rng = np.random.default_rng(rng)  # rng 可以是 seed 或 None
+        scale = np.linalg.norm(V.ptp(axis=0))  # 点云总体尺度
+        eps = (jitter * scale) if scale > 0 else jitter
+        V_jit = V + rng.uniform(-eps, eps, size=V.shape)
+        try:
+            return obb_by_trimesh(V_jit)
+        except Exception:
+            pass
+
+    # 最后回退：PCA OBB（非最小体积，但稳定、可复现）
+    if robust_fallback:
+        c = V.mean(axis=0)
+        X = V - c
+        # SVD 比协方差特征分解更稳
+        _, _, Vt = np.linalg.svd(X, full_matrices=False)
+        R = Vt  # 3x3，行向量为主轴
+        if np.linalg.det(R) < 0:  # 保证右手系
+            R[2] *= -1
+        proj = X @ R.T
+        pmin = proj.min(axis=0)
+        pmax = proj.max(axis=0)
+        extents = pmax - pmin
+        center_local = 0.5 * (pmin + pmax)
+        centroid = c + R.T @ center_local
+        T = np.eye(4)
+        T[:3, :3] = R
+        T[:3, 3] = centroid
+        return centroid, extents, T
+
+    # 如果不启用回退，就把第一次异常抛出去
+    # （这里人为抛一个通用错误）
+    raise RuntimeError("Failed to compute OBB from given vertices.")
+
