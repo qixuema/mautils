@@ -81,7 +81,7 @@ def polyline_to_prism(
     *,
     n_sides: int = 5,
     radius: float = 0.01,
-    color: tuple[float, float, float] = (1, 0, 0),
+    color: np.ndarray = np.array([1, 0, 0]),
     end_caps: bool = True,
 ) -> trimesh.Trimesh:
     """
@@ -106,7 +106,7 @@ def polyline_to_prism(
     mesh = trimesh.creation.sweep_polygon(polygon_2d, path=polyline, cap=end_caps)
 
     # 上色
-    rgba = (np.clip(np.array(color + (1.0,)), 0, 1) * 255).astype(np.uint8)
+    rgba = (np.clip(np.concatenate([color, [1.0]]), 0, 1) * 255).astype(np.uint8)
     mesh.visual.vertex_colors = np.tile(rgba, (len(mesh.vertices), 1))
 
     return mesh
