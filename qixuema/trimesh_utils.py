@@ -154,8 +154,11 @@ def get_vertices_obb(
         T:        (4,4) 齐次变换矩阵 (从 OBB 局部到世界)
     """
     V = np.asarray(vertices, dtype=np.float64)
-    if V.ndim != 2 or V.shape[1] != 3 or len(V) == 0:
-        raise ValueError("`vertices` 必须是形状 (N, 3), 且 N > 0")
+    if V.ndim != 2 or V.shape[1] != 3 or len(V) < 4:
+        raise ValueError("`vertices` 必须是形状 (N, 3), 且 N >= 4")
+
+    if np.allclose(V, V[0], atol=1e-8):
+        raise ValueError("所有点都相同")
 
     # 清除异常值 (NaN/Inf)
     if not np.isfinite(V).all():
