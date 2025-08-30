@@ -167,7 +167,7 @@ def get_vertices_obb(
             raise ValueError("所有点都包含 NaN/Inf")
 
     def obb_by_trimesh(points: np.ndarray):
-        T, extents = trimesh.bounds.oriented_bounds(points)  # 轻量且快
+        T, extents = trimesh.bounds.oriented_bounds(points, ordered=False)  # 轻量且快
         centroid = T[:3, 3]
         return centroid, extents, T
 

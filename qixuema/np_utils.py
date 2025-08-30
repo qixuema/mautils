@@ -329,3 +329,9 @@ def pad_sequence_np(
             raise ValueError("padding must be 'post' or 'pre'")
 
     return (out, used_lengths) if return_lengths else out
+
+# 也许可以写一个关于 polyline 的 class
+def polyline_length(polyline: np.ndarray) -> float:
+    diffs = np.diff(polyline, axis=0)        # shape = (N-1, D)
+    seg_lengths = np.linalg.norm(diffs, axis=1)
+    return np.sum(seg_lengths)
