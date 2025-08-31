@@ -1,45 +1,44 @@
-# mautils
+## mautils
 utils for saving my life
 
 ```
 pip install qixuema -i https://pypi.org/simple
 ```
 
-## Clean up old build files
+Clean up old build files
 ```
 rm -rf build dist *.egg-info
 ```
 
-## install and update build tools
+install and update build tools
 ```
 pip install -U packaging
 ```
 
-## build
+build
 ```
 python -m build
 ```
-
-## Upgrade twine to the latest version
+Upgrade twine to the latest version
 ```
 pip install --upgrade twine
 ```
 
-## check
+check
 ```
 twine check dist/*
 ```
 
-## Upload the package to PyPI
+Upload the package to PyPI
 ```
 twine upload dist/*
 ```
-## Upgrade and install the package
+Upgrade and install the package
 ```
 pip install --upgrade qixuema -i https://pypi.org/simple
 ```
 
-## install on local
+install on local
 ```
 python -m pip install -e . 
 ```
