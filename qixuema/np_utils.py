@@ -335,3 +335,33 @@ def polyline_length(polyline: np.ndarray) -> float:
     diffs = np.diff(polyline, axis=0)        # shape = (N-1, D)
     seg_lengths = np.linalg.norm(diffs, axis=1)
     return np.sum(seg_lengths)
+
+
+def boundary_vertex_indices(faces_idx: np.ndarray) -> np.ndarray:
+    """
+    返回边界顶点的索引（升序、唯一）。
+    faces_idx: (M,3) 三角形面片的顶点索引 (int), 要求是 unique 的
+    """
+    if faces_idx.size == 0:
+        return np.array([], dtype=np.int64)
+
+    # 1) 生成所有无向边（每个三角形3条）
+    e01 = faces_idx[:, [0, 1]]
+    e12 = faces_idx[:, [1, 2]]
+    e20 = faces_idx[:, [2, 0]]
+    edges = np.vstack((e01, e12, e20))  # (3M, 2)
+
+    # 2) 无向化：每条边小索引在前
+    edges = np.sort(edges, axis=1)
+
+    # 3) 统计每条边出现次数
+    # 使用 np.unique(axis=0) 是最快/最简洁的纯 NumPy 方法
+    uniq_edges, counts = np.unique(edges, axis=0, return_counts=True)
+
+    # 4) 边界边（只出现 1 次）
+    boundary_edges = uniq_edges[counts == 1]
+
+    # 5) 边界顶点 = 边界边的端点集合
+    boundary_vertices = np.unique(boundary_edges.ravel())
+
+    return boundary_vertices
