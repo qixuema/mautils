@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Iterable, Tuple, Optional, Union
+from typing import Iterable, Tuple, Optional, Union, List
 
 def check_nan_inf(data):
     contains_nan_inf = np.any(np.isnan(data)) or np.any(np.isinf(data))
@@ -365,3 +365,9 @@ def boundary_vertex_indices(faces_idx: np.ndarray) -> np.ndarray:
     boundary_vertices = np.unique(boundary_edges.ravel())
 
     return boundary_vertices
+
+def check_finite(data: List[np.ndarray]):
+    for value in data:
+        if not np.isfinite(value).all():
+            return False
+    return True
