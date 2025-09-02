@@ -125,7 +125,7 @@ def normalize_vertices(vertices, scale=1.0):
     denom = (bbmax - bbmin).max()
 
     if denom <= 1e-6:
-        raise ValueError(f"Degenerate bounding box: bbmin={bbmin}, bbmax={bbmax}, denom={denom}")
+        return None, None, None
     
     scale = 2.0 * scale / denom
     vertices = (vertices - center) * scale
