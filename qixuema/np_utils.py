@@ -371,3 +371,45 @@ def check_finite(data: List[np.ndarray]):
         if not np.isfinite(value).all():
             return False
     return True
+
+
+def safe_gather(source: np.ndarray, index_array: np.ndarray, padding_value=-1, fill_value=0):
+    """
+    参数：
+        source: shape=(N, D) 的顶点数组
+        index_array: 任意形状的索引数组，其中 padding_value 表示 padding
+        fill_value: 用于替换 padding_value 位置的值，可以是标量或 shape=(D,) 的数组
+
+    返回：
+        result: shape = index_array.shape + (D,) 的安全索引结果数组
+    """
+    if not np.issubdtype(index_array.dtype, np.integer):
+        raise ValueError("index_array 必须是整数类型")
+
+    # 顶点维度 D
+    D = source.shape[1]
+
+    # mask where index == padding_value
+    mask = index_array == padding_value
+
+    # 复制一份索引，并把 padding_value 替换成合法索引（比如 0）
+    safe_indices = index_array.copy()
+    safe_indices[mask] = 0
+
+    # 使用高级索引：flatten 再 reshape 成原索引形状 + D
+    flat_indices = safe_indices.flatten()
+    selected = source[flat_indices]  # shape = (prod(shape), D)
+    result = selected.reshape(index_array.shape + (D,))  # 还原原始结构
+
+    # 处理 fill_value
+    if np.isscalar(fill_value):
+        fill_value = np.full((D,), fill_value, dtype=source.dtype)
+    else:
+        fill_value = np.array(fill_value, dtype=source.dtype)
+        if fill_value.shape != (D,):
+            raise ValueError(f"fill_value 的 shape 应该是 ({D},)，但得到 {fill_value.shape}")
+
+    # 替换掉原来是 -1 的位置
+    result[mask] = fill_value
+
+    return result
