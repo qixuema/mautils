@@ -373,7 +373,7 @@ def check_finite(data: List[np.ndarray]):
     return True
 
 
-def safe_gather(source: np.ndarray, index_array: np.ndarray, padding_value=-1, fill_value=0):
+def safe_gather(source: np.ndarray, index_array: np.ndarray, pad_value=-1, fill_value=0):
     """
     参数：
         source: shape=(N, D) 的顶点数组
@@ -390,7 +390,7 @@ def safe_gather(source: np.ndarray, index_array: np.ndarray, padding_value=-1, f
     D = source.shape[1]
 
     # mask where index == padding_value
-    mask = index_array == padding_value
+    mask = index_array == pad_value
 
     # 复制一份索引，并把 padding_value 替换成合法索引（比如 0）
     safe_indices = index_array.copy()
