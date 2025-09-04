@@ -472,3 +472,24 @@ def cut_before_value(arr: np.ndarray, value, axis: int = 0):
         return arr[tuple(sl)], first_idx
     else:
         return arr.copy(), None
+
+
+def tolerant_lexsort(vertices, eps=1e-3, tie_break=False):
+    """
+    抗噪字典序排序 (主序:z→y→x).
+    - eps: 标量容差，三个轴共用.
+    - tie_break: 是否用原始值(z→y→x)作为平局破坏，保证同格内顺序稳定.
+    返回: 排序后的索引.
+    """
+    v = np.asarray(vertices, dtype=np.float64)
+
+    # 一次性量化到整数格；乘以倒数避免三次除法
+    q = np.rint(v * (1.0 / eps)).astype(np.int64, copy=False)
+
+    if tie_break:
+        # 主键: 量化 z→y→x；次键: 原始 z→y→x
+        return np.lexsort((v[:, 0], v[:, 1], v[:, 2],
+                           q[:, 0], q[:, 1], q[:, 2]))
+    else:
+        # 仅用量化键 (更快)
+        return np.lexsort((q[:, 0], q[:, 1], q[:, 2]))
