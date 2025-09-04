@@ -246,7 +246,7 @@ def pad_sequence_np(
     maxlen: Optional[int] = None,
     dtype: Optional[np.dtype] = None,
     pad_value: Union[int, float] = 0,
-    padding: str = "post",       # "post" 左对齐（在尾部补），"pre" 右对齐（在头部补）
+    padding: str = "post",       # "post" 左对齐 (在尾部补) ，"pre" 右对齐 (在头部补) 
     truncating: str = "post",    # 超过 maxlen 时从哪边截断："post" 前段保留，"pre" 后段保留
     return_lengths: bool = False
 ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
@@ -258,9 +258,9 @@ def pad_sequence_np(
         maxlen: 目标长度 M；若为 None，则取所有 Ti 的最大值。
         dtype: 结果 dtype；默认根据 pad_value 与各序列 dtype 推断。
         pad_value: 补齐用的值。
-        padding: "post" 或 "pre"（补在尾部/头部）。
-        truncating: 当 Ti > M 时从 "post"（尾部截掉）或 "pre"（头部截掉）。
-        return_lengths: 是否返回每条序列真实放入的长度（min(Ti, M)）。
+        padding: "post" 或 "pre" (补在尾部/头部) 。
+        truncating: 当 Ti > M 时从 "post" (尾部截掉) 或 "pre" (头部截掉) 。
+        return_lengths: 是否返回每条序列真实放入的长度 (min(Ti, M)) 。
 
     Returns:
         padded: 形状 (N, M, *feat_shape) 的数组。
@@ -272,7 +272,7 @@ def pad_sequence_np(
         out = np.empty((0, 0), dtype=(dtype or np.asarray(pad_value).dtype))
         return (out, np.empty((0,), dtype=int)) if return_lengths else out
 
-    # 统一特征维（length 维是轴 0），标量当作长度为 1 的序列
+    # 统一特征维 (length 维是轴 0) ，标量当作长度为 1 的序列
     def seq_len_and_tail(s: np.ndarray):
         if s.ndim == 0:
             return 1, ()
@@ -339,13 +339,13 @@ def polyline_length(polyline: np.ndarray) -> float:
 
 def boundary_vertex_indices(faces_idx: np.ndarray) -> np.ndarray:
     """
-    返回边界顶点的索引（升序、唯一）。
+    返回边界顶点的索引 (升序、唯一) 。
     faces_idx: (M,3) 三角形面片的顶点索引 (int), 要求是 unique 的
     """
     if faces_idx.size == 0:
         return np.array([], dtype=np.int64)
 
-    # 1) 生成所有无向边（每个三角形3条）
+    # 1) 生成所有无向边 (每个三角形3条) 
     e01 = faces_idx[:, [0, 1]]
     e12 = faces_idx[:, [1, 2]]
     e20 = faces_idx[:, [2, 0]]
@@ -358,7 +358,7 @@ def boundary_vertex_indices(faces_idx: np.ndarray) -> np.ndarray:
     # 使用 np.unique(axis=0) 是最快/最简洁的纯 NumPy 方法
     uniq_edges, counts = np.unique(edges, axis=0, return_counts=True)
 
-    # 4) 边界边（只出现 1 次）
+    # 4) 边界边 (只出现 1 次) 
     boundary_edges = uniq_edges[counts == 1]
 
     # 5) 边界顶点 = 边界边的端点集合
@@ -402,7 +402,7 @@ def safe_gather(
     
     mask = np.isin(index_array, pad_value)
 
-    # 复制一份索引，并把 padding_value 替换成合法索引（比如 0）
+    # 复制一份索引，并把 padding_value 替换成合法索引 (比如 0) 
     safe_indices = index_array.copy()
     safe_indices[mask] = 0
 
@@ -423,3 +423,52 @@ def safe_gather(
     result[mask] = fill_value
 
     return result
+
+
+
+def cut_before_value(arr: np.ndarray, value, axis: int = 0):
+    """
+    在指定 axis 上，找到第一个切片等于 value 的位置，并返回 axis 之前的部分。
+
+    参数：
+        arr   : 任意维 ndarray
+        value : 标量或可广播到 arr.shape[:axis] + arr.shape[axis+1:] 的数组
+        axis  : 沿哪个维度切割 (默认 0) 
+
+    返回：
+        arr_cut  : 在 axis 上切到 first_idx 之前的数组 (不含 first_idx) 
+        first_idx: 第一次匹配的下标；若未找到则为 None
+    """
+    arr = np.asarray(arr)
+    value = np.asarray(value)
+
+    if arr.ndim == 0:
+        raise ValueError("arr 至少应为 1 维")
+
+    # 规范化 axis
+    if axis < 0:
+        axis += arr.ndim
+    if not (0 <= axis < arr.ndim):
+        raise ValueError(f"axis 超出范围：{axis} 对于 arr.ndim={arr.ndim}")
+
+    # 把目标轴移到最前，方便逐切片比较
+    a = np.moveaxis(arr, axis, 0)  # shape: (N, ...rest)
+    # 与 value 比较；允许广播
+    eq = (a == value)
+
+    # 计算每个切片是否“完全等于”
+    if a.ndim == 1:
+        # 1D: 每个切片是标量，eq 形状就是 (N,)
+        matches = eq
+    else:
+        # 多维: 每个切片是 (...rest)，需在其余轴上 all
+        matches = np.all(eq, axis=tuple(range(1, a.ndim)))  # -> (N,)
+
+    if np.any(matches):
+        first_idx = int(np.argmax(matches))
+        # 构造切片：在 axis 维取 :first_idx
+        sl = [slice(None)] * arr.ndim
+        sl[axis] = slice(0, first_idx)
+        return arr[tuple(sl)], first_idx
+    else:
+        return arr.copy(), None
