@@ -494,10 +494,6 @@ def tolerant_lexsort(vertices, eps=1e-3, tie_break=False):
         # 仅用量化键 (更快)
         return np.lexsort((q[:, 0], q[:, 1], q[:, 2]))
 
-
-
-import numpy as np
-
 def dedup_with_mean(xyz, tolerance=1e-6, dtype=np.float64):
     """
     按 xyz/tolerance 的 round 分组；单点组保持原值，多点组取原始点的均值。
