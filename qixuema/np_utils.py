@@ -493,3 +493,48 @@ def tolerant_lexsort(vertices, eps=1e-3, tie_break=False):
     else:
         # 仅用量化键 (更快)
         return np.lexsort((q[:, 0], q[:, 1], q[:, 2]))
+
+
+
+import numpy as np
+
+def dedup_with_mean(xyz, tolerance=1e-6, dtype=np.float64):
+    """
+    按 xyz/tolerance 的 round 分组；单点组保持原值，多点组取原始点的均值。
+    
+    Parameters
+    ----------
+    xyz : (N, D) array_like
+    tolerance : float 或 (D,) array_like
+    
+    Returns
+    -------
+    xyz_unique : (K, D) ndarray
+        每个分组的代表点（均值）
+    inverse : (N,) ndarray of int
+        每个原始点映射到 xyz_unique 的索引
+    """
+    xyz = np.asarray(xyz, dtype=dtype)
+    tol = np.asarray(tolerance, dtype=dtype)
+    if tol.ndim == 0:
+        tol = np.full(xyz.shape[1], tol)
+    if np.any(tol <= 0):
+        raise ValueError("tolerance must be > 0")
+    
+    keys = np.round(xyz / tol).astype(np.int64)  # 分组键（格子坐标）
+    _, inv, counts = np.unique(keys, axis=0, return_inverse=True, return_counts=True)
+
+    sums = np.zeros((counts.size, xyz.shape[1]), dtype=dtype)
+    np.add.at(sums, inv, xyz)                    # 按组累加
+    xyz_unique = sums / counts[:, None]          # 组均值（单元素组即原值）
+    return xyz_unique, inv
+
+if __name__ == "__main__":
+    xyz = np.array([[0.01,0.02,0.03],[0.011,0.021,0.031],[1.,2.,3.],[2.,2.,2.]])
+    xyz_unique, inv = dedup_with_mean(xyz, tolerance=0.05)
+    print(xyz_unique)
+    print(inv) 
+    
+    # xyz_unique: [[0.0105,0.0205,0.031 ], [1.,2.,3.], [2.,2.,2.]]
+    # inv: [0,0,1,2]
+    
