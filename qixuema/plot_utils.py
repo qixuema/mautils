@@ -93,3 +93,36 @@ def plot_frequency_distribution(
     if save_path:
         plt.savefig(save_path, bbox_inches='tight')
     return ax
+
+
+def process_and_plot_feature(key, meta_data, save_dir='../results'):
+    feat_list = meta_data[key]
+
+    new_data = np.array(feat_list).astype(np.float32)
+    new_data = new_data[new_data > 0.0]
+    new_data += 1e-2  # 避免 log(0) 或极小值问题
+
+    print(f"\n==== Key: {key} ====")
+    print("原始长度:", len(feat_list))
+    print("均值:", np.mean(feat_list))
+    print("标准差:", np.std(feat_list))
+    print("最小值:", np.min(feat_list))
+    print("最大值:", np.max(feat_list))
+
+    # 截断高端异常值
+    threshold = np.percentile(new_data, 95)
+    new_data = new_data[new_data < threshold]
+    print("截断后长度:", len(new_data))
+
+    # 绘图
+    ax = plot_frequency_distribution(
+        new_data, bins=100, title=f'{key} distribution',
+        xlabel=key, ylabel='frequency',
+        save_path=f'{save_dir}/{key}-distribution.png'
+    )
+
+    # 可选：强制 Y 轴是整数
+    # from matplotlib.ticker import MaxNLocator
+    # ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    return ax
