@@ -95,7 +95,11 @@ def plot_frequency_distribution(
     return ax
 
 
-def process_and_plot_feature(key, meta_data, save_dir='../results'):
+def process_and_plot_feature(
+    key, meta_data, 
+    save_dir='../results',
+    clip_threshold=95,
+):
     feat_list = meta_data[key]
 
     new_data = np.array(feat_list).astype(np.float32)
@@ -110,7 +114,7 @@ def process_and_plot_feature(key, meta_data, save_dir='../results'):
     print("最大值:", np.max(feat_list))
 
     # 截断高端异常值
-    threshold = np.percentile(new_data, 95)
+    threshold = np.percentile(new_data, clip_threshold)
     new_data = new_data[new_data < threshold]
     print("截断后长度:", len(new_data))
 
