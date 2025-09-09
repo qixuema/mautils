@@ -525,6 +525,44 @@ def dedup_with_mean(xyz, tolerance=1e-6, dtype=np.float64):
     xyz_unique = sums / counts[:, None]          # 组均值（单元素组即原值）
     return xyz_unique, inv
 
+
+def remap_with_pad(
+    source: np.ndarray,
+    mapping: np.ndarray,
+    pad_value: int = -1,
+) -> np.ndarray:
+    """
+    对 chains_1D 中的索引做映射: i==-1(或 pad_value) 保持为 pad_value,否则替换为 mapping[i]。
+    - chains_1D: 任意形状，整数 dtype
+    - reverse_sort_vtx_inds: 一维映射表，长度为 N
+    - pad_value: padding 的标记值 (默认 -1)
+
+    返回: 与 chains_1D 同形状的整数数组
+    """
+    source = np.asarray(source)
+    mapping = np.asarray(mapping)
+
+    if not np.issubdtype(source.dtype, np.integer):
+        raise ValueError("source 必须是整数类型")
+    if mapping.ndim != 1:
+        raise ValueError("mapping 必须是一维数组")
+
+    # 输出 dtype 兼容 pad_value
+    out_dtype = np.result_type(source.dtype, mapping.dtype, type(pad_value))
+    out = np.empty(source.shape, dtype=out_dtype)
+
+    mask = (source == pad_value)
+    out[mask] = pad_value
+
+    if (~mask).any():
+        idx = source[~mask]
+        # 边界检查（可选，去掉也行）
+        if idx.min() < 0 or idx.max() >= mapping.shape[0]:
+            raise IndexError("索引越界：存在 <0 或 >= len(mapping) 的值")
+        out[~mask] = mapping[idx]
+
+    return out
+
 if __name__ == "__main__":
     xyz = np.array([[0.01,0.02,0.03],[0.011,0.021,0.031],[1.,2.,3.],[2.,2.,2.]])
     xyz_unique, inv = dedup_with_mean(xyz, tolerance=0.05)
@@ -533,4 +571,3 @@ if __name__ == "__main__":
     
     # xyz_unique: [[0.0105,0.0205,0.031 ], [1.,2.,3.], [2.,2.,2.]]
     # inv: [0,0,1,2]
-    
