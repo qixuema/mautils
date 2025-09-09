@@ -213,3 +213,34 @@ def get_vertices_obb(
     # （这里人为抛一个通用错误）
     raise RuntimeError("Failed to compute OBB from given vertices.")
 
+
+def points_to_spheres(
+    points: np.ndarray,
+    *,
+    radius: float = 0.005,
+    subdivisions: int = 1,
+) -> list[trimesh.Trimesh]:
+    """
+    Args:
+        points: (N, 3)
+        radius: float
+        subdivisions: int
+
+    Returns:
+        list[trimesh.Trimesh]
+    """
+
+    # 存放所有球体mesh的列表
+    spheres = []
+
+    for point in points:
+        # 创建单位球
+        sphere = trimesh.creation.icosphere(subdivisions=subdivisions, radius=radius)
+        
+        # 移动球体到目标点
+        sphere.apply_translation(point)
+
+        # 加入列表
+        spheres.append(sphere)
+        
+    return spheres
