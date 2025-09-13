@@ -244,3 +244,23 @@ def points_to_spheres(
         spheres.append(sphere)
         
     return spheres
+
+def to_mesh(vertices, faces, post_process=False):
+    
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+    
+    if post_process:
+        mesh.merge_vertices()
+        mesh.update_faces(mesh.unique_faces())
+        mesh.fix_normals()
+    
+    return mesh
+
+def uniform_pc_sampling(mesh, pc_num_total=20480):
+    points, face_idx = mesh.sample(pc_num_total, return_index=True)
+
+    normals = mesh.face_normals[face_idx]
+
+    pc_normal = np.concatenate([points, normals], axis=-1, dtype=np.float16)
+
+    return pc_normal
