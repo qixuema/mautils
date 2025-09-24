@@ -111,16 +111,40 @@ def polyline_to_prism(
 
     return mesh
 
-def polylines_to_mesh(polylines, radius=0.1, n_sides=5):
+def polylines_to_mesh(polylines, radius=0.1, n_sides=5, color_scheme='rainbow'):
     """
     Args:
         polylines: List[Array(M,3)] 采样点。
         radius:   截面外接圆半径。
+        color_scheme: 颜色方案 ('rainbow' 表示彩虹色谱, 'random' 表示随机色彩)
+                      彩虹色谱: 红(0) → 黄(1/4) → 绿(1/3) → 青(1/2) → 蓝(2/3) → 紫(1)
     """
     meshes = []
+    n_polylines = len(polylines)
     
-    for polyline in polylines:
-        color = np.random.rand(3)
+    for i, polyline in enumerate(polylines):
+        if color_scheme == 'rainbow':
+            # 使用彩虹色谱，便于根据颜色估算序号
+            ratio = i / max(n_polylines - 1, 1)  # 0 到 1 的顺序变化
+            
+            # 彩虹色谱映射：红→黄→绿→青→蓝→紫
+            if ratio < 0.17:  # 红色区域
+                color = np.array([1.0, ratio * 6, 0.0])
+            elif ratio < 0.33:  # 红色到黄色
+                color = np.array([1.0, 0.5 + (ratio - 0.17) * 3, 0.0])
+            elif ratio < 0.5:  # 黄色到绿色
+                color = np.array([1.0 - (ratio - 0.33) * 3, 1.0, 0.0])
+            elif ratio < 0.67:  # 绿色到青色
+                color = np.array([0.0, 1.0, (ratio - 0.5) * 6])
+            elif ratio < 0.83:  # 青色到蓝色
+                color = np.array([0.0, 1.0 - (ratio - 0.67) * 3, 1.0])
+            else:  # 蓝色到紫色
+                color = np.array([(ratio - 0.83) * 6, 0.0, 1.0])
+                
+            color = np.clip(color, 0, 1)  # 确保颜色值在 [0,1] 范围内
+        else:
+            # 保持原有的随机颜色方案
+            color = np.random.rand(3)
         
         prism =  polyline_to_prism(polyline, color=color, radius=radius, n_sides=n_sides)
         
