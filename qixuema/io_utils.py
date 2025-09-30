@@ -96,7 +96,7 @@ def load_yaml(config_path="config.yaml"):
         return yaml.safe_load(file)
             
 
-def save_obj_with_uv(output_path, xyz, uvs, faces_xyz, faces_uv, precision=6):
+def save_obj_with_uv(output_path, xyz, uvs, faces_xyz, faces_uv, precision=None):
     """
     保存带 UV 坐标的 OBJ 文件，可控制浮点数精度。
     
@@ -106,13 +106,20 @@ def save_obj_with_uv(output_path, xyz, uvs, faces_xyz, faces_uv, precision=6):
         uvs: UV 坐标数组 (N, 2)  
         faces_xyz: 顶点面索引数组 (M, 3)
         faces_uv: UV 面索引数组 (M, 3)
-        precision: 浮点数精度（小数位数），默认为 6
+        precision: 浮点数精度（小数位数），默认为 None，不进行截断
     """
     # 首先进行精度截断，保留原始数据的副本
-    multiplier = 10 ** precision
+    if precision is not None:
+        multiplier = 10 ** precision
     
-    # 截断顶点坐标精度
-    xyz_truncated = np.round(np.array(xyz) * multiplier) / multiplier
+        # 截断顶点坐标精度
+        xyz_truncated = np.round(np.array(xyz) * multiplier) / multiplier
+        
+        # 截断 UV 坐标精度  
+        uvs_truncated = np.round(np.array(uvs) * multiplier) / multiplier
+    else:
+        xyz_truncated = xyz
+        uvs_truncated = uvs
     
     # 截断 UV 坐标精度  
     uvs_truncated = np.round(np.array(uvs) * multiplier) / multiplier
