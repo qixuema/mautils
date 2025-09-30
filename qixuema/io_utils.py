@@ -96,14 +96,37 @@ def load_yaml(config_path="config.yaml"):
         return yaml.safe_load(file)
             
 
-def save_obj_with_uv(output_path, xyz, uvs, faces_xyz, faces_uv):
+def save_obj_with_uv(output_path, xyz, uvs, faces_xyz, faces_uv, precision=6):
+    """
+    保存带 UV 坐标的 OBJ 文件，可控制浮点数精度。
+    
+    Args:
+        output_path: 输出文件路径
+        xyz: 顶点坐标数组 (N, 3)
+        uvs: UV 坐标数组 (N, 2)  
+        faces_xyz: 顶点面索引数组 (M, 3)
+        faces_uv: UV 面索引数组 (M, 3)
+        precision: 浮点数精度（小数位数），默认为 6
+    """
+    # 首先进行精度截断，保留原始数据的副本
+    multiplier = 10 ** precision
+    
+    # 截断顶点坐标精度
+    xyz_truncated = np.round(np.array(xyz) * multiplier) / multiplier
+    
+    # 截断 UV 坐标精度  
+    uvs_truncated = np.round(np.array(uvs) * multiplier) / multiplier
+    
     with open(output_path, 'w') as file:
-        for vertex in xyz:
+        # 直接写入已截断精度的顶点坐标
+        for vertex in xyz_truncated:
             file.write(f"v {' '.join(map(str, vertex))}\n")
         
-        for uv in uvs:
+        # 直接写入已截断精度的 UV 坐标
+        for uv in uvs_truncated:
             file.write(f"vt {' '.join(map(str, uv))}\n")
         
+        # 面索引保持整数，不受精度影响
         for face_v, face_vt in zip(faces_xyz, faces_uv):
             face_line = ' '.join(
                 [f"{int(face_v[j]) + 1}/{int(face_vt[j]) + 1}" for j in range(3)]
