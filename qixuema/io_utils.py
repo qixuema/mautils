@@ -120,10 +120,7 @@ def save_obj_with_uv(output_path, xyz, uvs, faces_xyz, faces_uv, precision=None)
     else:
         xyz_truncated = xyz
         uvs_truncated = uvs
-    
-    # 截断 UV 坐标精度  
-    uvs_truncated = np.round(np.array(uvs) * multiplier) / multiplier
-    
+        
     with open(output_path, 'w') as file:
         # 直接写入已截断精度的顶点坐标
         for vertex in xyz_truncated:
