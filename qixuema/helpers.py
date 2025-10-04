@@ -13,6 +13,12 @@ import random
 from collections import defaultdict
 
 
+def safe_name(name: str) -> str:
+    """Make a filesystem-friendly name."""
+    if not name:
+        return "unnamed"
+    return re.sub(r'[^a-zA-Z0-9_.-]+', '_', name)
+
 def first(it):
     return it[0]
 
@@ -428,4 +434,4 @@ class Timers(object):
 
     def get_avg(self, key):
         return self.timers[key].avg()
-    
+        

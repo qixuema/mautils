@@ -125,6 +125,7 @@ def normalize_vertices(vertices, scale=1.0):
     denom = (bbmax - bbmin).max()
 
     if denom <= 1e-6:
+        print(f"Warning: denom is too small: {denom}")
         return None, None, None
     
     scale = 2.0 * scale / denom
@@ -494,7 +495,7 @@ def tolerant_lexsort(vertices, eps=1e-3, tie_break=False):
         # 仅用量化键 (更快)
         return np.lexsort((q[:, 0], q[:, 1], q[:, 2]))
 
-def dedup_with_mean(xyz, tolerance=1e-6, dtype=np.float64):
+def dedup_with_mean(xyz, tol=1e-6, dtype=np.float64):
     """
     按 xyz/tolerance 的 round 分组；单点组保持原值，多点组取原始点的均值。
     
@@ -511,7 +512,7 @@ def dedup_with_mean(xyz, tolerance=1e-6, dtype=np.float64):
         每个原始点映射到 xyz_unique 的索引
     """
     xyz = np.asarray(xyz, dtype=dtype)
-    tol = np.asarray(tolerance, dtype=dtype)
+    tol = np.asarray(tol, dtype=dtype)
     if tol.ndim == 0:
         tol = np.full(xyz.shape[1], tol)
     if np.any(tol <= 0):
@@ -565,7 +566,7 @@ def remap_with_pad(
 
 if __name__ == "__main__":
     xyz = np.array([[0.01,0.02,0.03],[0.011,0.021,0.031],[1.,2.,3.],[2.,2.,2.]])
-    xyz_unique, inv = dedup_with_mean(xyz, tolerance=0.05)
+    xyz_unique, inv = dedup_with_mean(xyz, tol=0.05)
     print(xyz_unique)
     print(inv) 
     
