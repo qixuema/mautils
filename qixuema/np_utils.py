@@ -148,6 +148,14 @@ def deduplicate_lines(lines):
 def deduplicate_faces(faces, faces_uv=None):
     """
     deduplicate faces by xyz, return unique faces without change face normal
+    
+    Args:
+        faces: (N,3) int array of face indices
+        faces_uv: optional (N,3) int array of UV face indices, synchronized with faces
+    
+    Returns:
+        faces_unique: (M,3) int array of unique faces
+        faces_uv_unique: (M,3) int array of unique UV faces, only returned if faces_uv is provided
     """
     sorted_faces = np.sort(faces, axis=1)
     _, indices = np.unique(sorted_faces, axis=0, return_index=True)
@@ -160,14 +168,30 @@ def deduplicate_faces(faces, faces_uv=None):
     
     return faces_unique
 
-def clean_invalid_faces(faces):
+def clean_invalid_faces(faces, faces_uv=None):
     """
-    remove invalid faces, return valid faces indices
-    faces: (N,3) int
+    remove invalid faces, return valid faces (and UV faces if provided)
+    invalid faces are those with duplicate vertex indices (e.g., [0,1,0] or [1,1,2])
+    
+    Args:
+        faces: (N,3) int array of face indices
+        faces_uv: optional (N,3) int array of UV face indices, synchronized with faces
+    
+    Returns:
+        faces_valid: (M,3) int array of valid faces
+        faces_uv_valid: (M,3) int array of valid UV faces, only returned if faces_uv is provided
     """
     f0, f1, f2 = faces[:, 0], faces[:, 1], faces[:, 2]
     invalid = (f0 == f1) | (f0 == f2) | (f1 == f2)
-    return faces[~invalid]
+    valid_mask = ~invalid
+    
+    faces_valid = faces[valid_mask]
+    
+    if faces_uv is not None:
+        faces_uv_valid = faces_uv[valid_mask]
+        return faces_valid, faces_uv_valid
+    
+    return faces_valid
 
 def clean_invalid_lines(lines):
     """
