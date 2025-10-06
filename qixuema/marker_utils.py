@@ -44,3 +44,7 @@ def generate_markers_for_existing_files(
 def count_converted_samples(output_dir: Path, marker_suffix: str = ".done") -> int:
     """Count successfully converted samples based on marker files."""
     return sum(1 for _ in output_dir.rglob(f"*{marker_suffix}"))
+
+
+def exists_done_marker(out_path: Path) -> bool:
+    return marker_path_for(out_path, status="done").exists()
