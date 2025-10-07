@@ -588,11 +588,47 @@ def remap_with_pad(
 
     return out
 
-if __name__ == "__main__":
-    xyz = np.array([[0.01,0.02,0.03],[0.011,0.021,0.031],[1.,2.,3.],[2.,2.,2.]])
-    xyz_unique, inv = dedup_with_mean(xyz, tol=0.05)
-    print(xyz_unique)
-    print(inv) 
-    
-    # xyz_unique: [[0.0105,0.0205,0.031 ], [1.,2.,3.], [2.,2.,2.]]
-    # inv: [0,0,1,2]
+
+def faces_to_edges(faces, return_index=False):
+    """
+    Given a list of faces (n,3), return a list of edges (n*3,2)
+
+    Parameters
+    -----------
+    faces : (n, 3) int
+      Vertex indices representing faces
+
+    Returns
+    -----------
+    edges : (n*3, 2) int
+      Vertex indices representing edges
+    """
+    faces = np.asanyarray(faces, np.int64)
+
+    # each face has three edges
+    edges = faces[:, [0, 1, 1, 2, 2, 0]].reshape((-1, 2))
+
+    if return_index:
+        # edges are in order of faces due to reshape
+        face_index = np.tile(np.arange(len(faces)), (3, 1)).T.reshape(-1)
+        return edges, face_index
+    return edges
+
+def triangle_areas(vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    """
+    vertices: (V,3)
+    faces:    (F,3)  dtype=int, 每行是三角面顶点索引
+    return:   (F,)   每个三角形的面积
+    """
+    v = np.asarray(vertices, dtype=np.float32)
+    f = np.asarray(faces, dtype=np.int32)
+
+    a = v[f[:, 0]]
+    b = v[f[:, 1]]
+    c = v[f[:, 2]]
+
+    ab = b - a
+    ac = c - a
+    cross = np.cross(ab, ac)            # (F,3)
+    areas = 0.5 * np.linalg.norm(cross, axis=1)
+    return areas
