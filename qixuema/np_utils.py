@@ -623,6 +623,9 @@ def triangle_areas(vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
     v = np.asarray(vertices, dtype=np.float32)
     f = np.asarray(faces, dtype=np.int32)
 
+    if v.shape[1] == 2:
+        v = np.pad(v, ((0, 0), (0, 1)))  # z=0
+
     a = v[f[:, 0]]
     b = v[f[:, 1]]
     c = v[f[:, 2]]
