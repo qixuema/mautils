@@ -635,3 +635,17 @@ def triangle_areas(vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
     cross = np.cross(ab, ac)            # (F,3)
     areas = 0.5 * np.linalg.norm(cross, axis=1)
     return areas
+
+def order_and_sort_edges(seam_edges: np.ndarray) -> np.ndarray:
+    a = np.asarray(seam_edges, dtype=np.int64)
+
+    # 行内“排序”：把每条边写成 (min, max)，比 a.sort(axis=1) 更省开销
+    lo = np.minimum(a[:, 0], a[:, 1])
+    hi = np.maximum(a[:, 0], a[:, 1])
+    a = np.column_stack((lo, hi))
+
+    # 外部字典序：按 (col0, col1) 排序
+    # 注意：np.lexsort 的“最后一个 key 是主键”
+    idx = np.lexsort((a[:, 1], a[:, 0]))  # 先按第一列，再按第二列
+    return a[idx]
+
