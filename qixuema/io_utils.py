@@ -123,7 +123,7 @@ def _write_data(fp, xyz, uvs, faces_v, faces_vt, cur_v_off=0, cur_vt_off=0):
             + "\n"
         )
 
-def save_obj_with_uv(output_path, xyz, uvs, faces_xyz, faces_uv, precision=None):
+def save_obj_with_uv(output_path, xyz, uv, faces_xyz, faces_uv, precision=None):
     """
     保存带 UV 坐标的 OBJ 文件，可控制浮点数精度。
     
@@ -137,10 +137,10 @@ def save_obj_with_uv(output_path, xyz, uvs, faces_xyz, faces_uv, precision=None)
     """
     # Optional rounding for clean files and smaller diffs
     xyz = _round_if_needed(xyz, precision)
-    uvs = _round_if_needed(uvs, precision)
+    uv = _round_if_needed(uv, precision)
         
     with open(output_path, 'w') as file:
-        _write_data(file, xyz, uvs, faces_xyz, faces_uv)
+        _write_data(file, xyz, uv, faces_xyz, faces_uv)
 
 def save_obj_parts_with_uv(
     output_path: str,

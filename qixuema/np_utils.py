@@ -362,18 +362,18 @@ def polyline_length(polyline: np.ndarray) -> float:
     return np.sum(seg_lengths)
 
 
-def boundary_vertex_indices(faces_idx: np.ndarray) -> np.ndarray:
+def boundary_vertex_indices(faces: np.ndarray) -> np.ndarray:
     """
     返回边界顶点的索引 (升序、唯一) 。
     faces_idx: (M,3) 三角形面片的顶点索引 (int), 要求是 unique 的
     """
-    if faces_idx.size == 0:
+    if faces.size == 0:
         return np.array([], dtype=np.int64)
 
     # 1) 生成所有无向边 (每个三角形3条) 
-    e01 = faces_idx[:, [0, 1]]
-    e12 = faces_idx[:, [1, 2]]
-    e20 = faces_idx[:, [2, 0]]
+    e01 = faces[:, [0, 1]]
+    e12 = faces[:, [1, 2]]
+    e20 = faces[:, [2, 0]]
     edges = np.vstack((e01, e12, e20))  # (3M, 2)
 
     # 2) 无向化：每条边小索引在前
@@ -519,7 +519,7 @@ def tolerant_lexsort(vertices, eps=1e-3, tie_break=False):
         # 仅用量化键 (更快)
         return np.lexsort((q[:, 0], q[:, 1], q[:, 2]))
 
-def dedup_with_mean(xyz, tol=1e-6, dtype=np.float64):
+def dedup_with_mean(vertices, tol=1e-6, dtype=np.float64):
     """
     按 xyz/tolerance 的 round 分组；单点组保持原值，多点组取原始点的均值。
     
@@ -535,18 +535,18 @@ def dedup_with_mean(xyz, tol=1e-6, dtype=np.float64):
     inverse : (N,) ndarray of int
         每个原始点映射到 xyz_unique 的索引
     """
-    xyz = np.asarray(xyz, dtype=dtype)
+    vertices = np.asarray(vertices, dtype=dtype)
     tol = np.asarray(tol, dtype=dtype)
     if tol.ndim == 0:
-        tol = np.full(xyz.shape[1], tol)
+        tol = np.full(vertices.shape[1], tol)
     if np.any(tol <= 0):
         raise ValueError("tolerance must be > 0")
     
-    keys = np.round(xyz / tol).astype(np.int64)  # 分组键（格子坐标）
+    keys = np.round(vertices / tol).astype(np.int64)  # 分组键（格子坐标）
     _, inv, counts = np.unique(keys, axis=0, return_inverse=True, return_counts=True)
 
-    sums = np.zeros((counts.size, xyz.shape[1]), dtype=dtype)
-    np.add.at(sums, inv, xyz)                    # 按组累加
+    sums = np.zeros((counts.size, vertices.shape[1]), dtype=dtype)
+    np.add.at(sums, inv, vertices)                    # 按组累加
     xyz_unique = sums / counts[:, None]          # 组均值（单元素组即原值）
     return xyz_unique, inv
 
