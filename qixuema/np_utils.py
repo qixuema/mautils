@@ -519,7 +519,12 @@ def tolerant_lexsort(vertices, eps=1e-3, tie_break=False):
         # 仅用量化键 (更快)
         return np.lexsort((q[:, 0], q[:, 1], q[:, 2]))
 
-def dedup_with_mean(vertices, tol=1e-6, dtype=np.float64):
+def dedup_with_mean(
+    vertices, 
+    tol=1e-6, 
+    return_index: bool = False,
+    dtype=np.float64  
+):
     """
     按 xyz/tolerance 的 round 分组；单点组保持原值，多点组取原始点的均值。
     
@@ -543,11 +548,13 @@ def dedup_with_mean(vertices, tol=1e-6, dtype=np.float64):
         raise ValueError("tolerance must be > 0")
     
     keys = np.round(vertices / tol).astype(np.int64)  # 分组键（格子坐标）
-    _, inv, counts = np.unique(keys, axis=0, return_inverse=True, return_counts=True)
+    _, idx, inv, counts = np.unique(keys, axis=0, return_index=True, return_inverse=True, return_counts=True)
 
     sums = np.zeros((counts.size, vertices.shape[1]), dtype=dtype)
     np.add.at(sums, inv, vertices)                    # 按组累加
     xyz_unique = sums / counts[:, None]          # 组均值（单元素组即原值）
+    if return_index:
+        return xyz_unique, idx, inv
     return xyz_unique, inv
 
 
