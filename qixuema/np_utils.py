@@ -361,7 +361,6 @@ def polyline_length(polyline: np.ndarray) -> float:
     seg_lengths = np.linalg.norm(diffs, axis=1)
     return np.sum(seg_lengths)
 
-
 def boundary_vertex_indices(faces: np.ndarray) -> np.ndarray:
     """
     返回边界顶点的索引 (升序、唯一) 。
@@ -387,9 +386,9 @@ def boundary_vertex_indices(faces: np.ndarray) -> np.ndarray:
     boundary_edges = uniq_edges[counts == 1]
 
     # 5) 边界顶点 = 边界边的端点集合
-    boundary_vertices = np.unique(boundary_edges.ravel())
+    boundary_vtx_idxes = np.unique(boundary_edges.ravel())
 
-    return boundary_vertices
+    return boundary_vtx_idxes
 
 def check_finite(data: List[np.ndarray]):
     for value in data:
