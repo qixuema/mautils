@@ -93,6 +93,142 @@ def read_obj(file_path):
         "lines": np.array(lines, dtype=np.int32) if lines else np.empty((0, 2), dtype=np.int32),
     }
 
+
+def write_obj(
+    file_path: str,
+    data: Dict[str, np.ndarray],
+    float_fmt: str = "{:.6f}",
+    write_header_comment: bool = True,
+) -> None:
+    """
+    Write an OBJ file from a dict compatible with `read_obj`.
+
+    Args:
+        file_path: output .obj path
+        data: dict with keys (same as read_obj output):
+            - xyz: (N, 3) float32
+            - uv: (M, 2) float32
+            - v_normals: (K, 3) float32
+            - faces_xyz: (F, 3) int32 (0-based)
+            - faces_uv: (F, 3) int32 (0-based, or -1 if missing)
+            - face_normals: (F, 3) int32 (0-based, or -1 if missing)
+            - lines: (L, 2) int32 (0-based)
+        float_fmt: formatting for floats (e.g., "{:.6f}")
+        write_header_comment: write a brief comment header
+    """
+    xyz: np.ndarray = data.get("xyz", np.empty((0, 3), dtype=np.float32))
+    uv: np.ndarray = data.get("uv", np.empty((0, 2), dtype=np.float32))
+    v_normals: np.ndarray = data.get("v_normals", np.empty((0, 3), dtype=np.float32))
+    faces_xyz: np.ndarray = data.get("faces_xyz", np.empty((0, 3), dtype=np.int32))
+    faces_uv: np.ndarray = data.get("faces_uv", np.empty((0, 3), dtype=np.int32))
+    face_normals: np.ndarray = data.get("face_normals", np.empty((0, 3), dtype=np.int32))
+    lines: np.ndarray = data.get("lines", np.empty((0, 2), dtype=np.int32))
+
+    # Basic validations / shape normalization
+    if xyz.size and xyz.shape[1] != 3:
+        raise ValueError("xyz must be (N, 3).")
+    if uv.size and uv.shape[1] < 2:
+        raise ValueError("uv must be (M, 2) or (M, >=2).")
+    if v_normals.size and v_normals.shape[1] != 3:
+        raise ValueError("v_normals must be (K, 3).")
+    if faces_xyz.size and faces_xyz.shape[1] != 3:
+        raise ValueError("faces_xyz must be (F, 3) triangles.")
+    if faces_uv.size and faces_uv.shape != faces_xyz.shape:
+        # allow empty faces_uv; otherwise must align with faces_xyz
+        if faces_uv.size != 0:
+            raise ValueError("faces_uv must have shape (F, 3) matching faces_xyz.")
+    if face_normals.size and face_normals.shape != faces_xyz.shape:
+        if face_normals.size != 0:
+            raise ValueError("face_normals must have shape (F, 3) matching faces_xyz.")
+    if lines.size and lines.shape[1] < 2:
+        raise ValueError("lines must be (L, >=2).")
+
+    has_uv_faces = faces_uv.size != 0
+    has_vn_faces = face_normals.size != 0
+    has_vt_pool = uv.size != 0
+    has_vn_pool = v_normals.size != 0
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        if write_header_comment:
+            f.write("# Written by write_obj\n")
+            f.write(f"# V={xyz.shape[0]} VT={uv.shape[0]} VN={v_normals.shape[0]} "
+                    f"F={faces_xyz.shape[0]} L={lines.shape[0]}\n")
+
+        # v
+        for v in xyz:
+            f.write("v " + " ".join(float_fmt.format(x) for x in v[:3]) + "\n")
+
+        # vt
+        if has_vt_pool:
+            for t in uv:
+                # OBJ vt can be 2D or 3D; we write only first two (u,v)
+                f.write("vt " + " ".join(float_fmt.format(x) for x in t[:2]) + "\n")
+
+        # vn
+        if has_vn_pool:
+            for n in v_normals:
+                f.write("vn " + " ".join(float_fmt.format(x) for x in n[:3]) + "\n")
+
+        # f (triangles)
+        F = faces_xyz.shape[0]
+        for i in range(F):
+            vi = faces_xyz[i]  # (3,)
+            # Defensive checks
+            if np.any(vi < 0):
+                raise ValueError("faces_xyz contains negative indices.")
+            tokens = []
+            for c in range(3):
+                v_idx = int(vi[c]) + 1  # OBJ is 1-based
+
+                # decide vt / vn per corner
+                ti = None
+                ni = None
+
+                if has_uv_faces and has_vt_pool:
+                    t_raw = int(faces_uv[i, c])
+                    if t_raw >= 0:
+                        ti = t_raw + 1
+
+                if has_vn_faces and has_vn_pool:
+                    n_raw = int(face_normals[i, c])
+                    if n_raw >= 0:
+                        ni = n_raw + 1
+
+                # assemble per-corner token
+                if ti is None and ni is None:
+                    token = f"{v_idx}"
+                elif ti is None and ni is not None:
+                    token = f"{v_idx}//{ni}"
+                elif ti is not None and ni is None:
+                    token = f"{v_idx}/{ti}"
+                else:
+                    token = f"{v_idx}/{ti}/{ni}"
+
+                tokens.append(token)
+
+            f.write("f " + " ".join(tokens) + "\n")
+
+        # l (polyline segments). Each row may contain 2+ indices; we support both.
+        if lines.size:
+            # If lines is strictly (L,2), write pairs; if (L,>2), write polyline
+            if lines.ndim == 2:
+                for row in lines:
+                    row = np.asarray(row).ravel()
+                    if row.size < 2:
+                        continue
+                    # OBJ 'l' expects 1-based vertex indices
+                    idx_str = " ".join(str(int(x) + 1) for x in row)
+                    f.write("l " + idx_str + "\n")
+            else:
+                # Allow (variable-length) list of index arrays
+                for row in lines:
+                    row = np.asarray(row).ravel()
+                    if row.size < 2:
+                        continue
+                    idx_str = " ".join(str(int(x) + 1) for x in row)
+                    f.write("l " + idx_str + "\n")
+
+
 def write_obj_file(file_path, vertices, faces=None, vtx_colors=None, is_line=False, is_point=False):
     """
     Save a simple OBJ file with vertices and faces.
