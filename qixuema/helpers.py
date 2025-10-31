@@ -435,3 +435,71 @@ class Timers(object):
     def get_avg(self, key):
         return self.timers[key].avg()
         
+
+def make_safe_filename(
+    filename: str, replace_spaces: bool = True, 
+    allow_chars: tuple = ('-', '_', '.')
+) -> str:
+    """
+    将文件名转换为安全的格式
+    
+    Args:
+        filename: 原始文件名（可以包含路径）
+        replace_spaces: 是否将空格替换为下划线（默认True）
+        allow_chars: 允许保留的特殊字符元组（默认允许 - _.）
+    
+    Returns:
+        安全的文件名
+        
+    Examples:
+        >>> make_safe_filename("my file name.txt")
+        'my_file_name.txt'
+        >>> make_safe_filename("test-file 123.obj")  
+        'test-file_123.obj'
+        >>> make_safe_filename("file with[brackets].ply")
+        'file_with_brackets_.ply'
+        >>> make_safe_filename("my file.txt", replace_spaces=False)
+        'myfile.txt'
+    """
+    # 分离文件名和扩展名
+    if '.' in filename:
+        name_part, ext_part = filename.rsplit('.', 1)
+        has_ext = True
+    else:
+        name_part, ext_part = filename, ''
+        has_ext = False
+    
+    # 处理空格替换
+    if replace_spaces:
+        name_part = name_part.replace(' ', '_')
+    
+    # 清理不安全字符
+    safe_chars = []
+    for char in name_part:
+        if char.isalnum() or char in allow_chars:
+            safe_chars.append(char)
+    
+    safe_name_part = ''.join(safe_chars)
+    
+    # 重新组合文件名和扩展名
+    if has_ext:
+        return f"{safe_name_part}.{ext_part}"
+    else:
+        return safe_name_part
+
+
+if __name__ == '__main__':
+    
+    from pathlib import Path
+    import shutil
+    
+    input_dir = '/root/studio/datasets/texverse/skeleton_data/src/warrior_helmet/data/'
+    output_dir = '/root/studio/datasets/texverse/skeleton_data/objs/warrior_helmet/data/'
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    obj_paths = list(Path(input_dir).glob('*.obj'))
+    
+    for obj_path in obj_paths:
+        safe_name = make_safe_filename(obj_path.name)
+        safe_path = Path(output_dir) / safe_name
+        safe_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(obj_path, safe_path)

@@ -12,43 +12,86 @@ def read_vertices_obj(filename):
                 vertices.append([float(coord) for coord in parts[1:4]])
     return np.array(vertices)
 
-def read_obj_file(file_path):
-    vertices = []
-    faces = []
+def read_obj(file_path):
+    """
+    Read an OBJ file and extract vertices, UVs, normals, faces, and lines.
+
+    Returns:
+        dict with:
+            - xyz: (N, 3)
+            - uv: (M, 2)
+            - v_normals: (K, 3)
+            - faces_xyz: (F, 3) vertex indices (0-based)
+            - faces_uv: (F, 3) uv indices (0-based, or -1 if missing)
+            - lines: (L, 2) line indices (0-based)
+    """    
+    xyz = []
+    uv = []
+    faces_xyz = []
+    faces_uv = []
+    face_normals = []
     lines = []
     vertice_normals = []
 
     with open(file_path, 'r') as file:
         for line in file:
-            components = line.strip().split()
+            if not line.strip() or line.startswith("#"):
+                continue
+                        
+            parts = line.strip().split()
 
-            if not components:
+            if not parts:
                 continue
 
-            if components[0] == 'v':
+            if parts[0] == 'v':
                 # Parse vertex coordinates
-                vertex = tuple(map(float, components[1:4]))
-                vertices.append(vertex)
-            elif components[0] == 'f':
-                # Parse face indices (assuming triangular faces)
-                face = tuple(map(int, components[1:4]))
-                # face = [list(map(int, p.split('/'))) for p in components[1:]]
-                faces.append(face)
+                vertex = tuple(map(float, parts[1:4]))
+                xyz.append(vertex)
+
+            elif parts[0] == "vt":
+                # UV can be 2D or 3D (u,v[,w]) → usually only u,v
+                uv.append(tuple(map(float, parts[1:3])))                
+
+            elif parts[0] == "vn":
+                vertice_normals.append(tuple(map(float, parts[1:4])))
+
+            elif parts[0] == 'f':
+                v_idx, vt_idx, vn_idx = [], [], []
+                for v in parts[1:]:
+                    tokens = v.split("/")
+                    # handle v, v/vt, v//vn, v/vt/vn cases
+                    vi = int(tokens[0]) - 1 if tokens[0] else -1
+                    ti = int(tokens[1]) - 1 if len(tokens) > 1 and tokens[1] else -1
+                    ni = int(tokens[2]) - 1 if len(tokens) > 2 and tokens[2] else -1
+
+                    v_idx.append(vi)
+                    vt_idx.append(ti)
+                    vn_idx.append(ni)
+
+                # triangulate faces with >3 vertices
+                for i in range(1, len(v_idx) - 1):
+                    faces_xyz.append((v_idx[0], v_idx[i], v_idx[i + 1]))
+                    faces_uv.append((vt_idx[0], vt_idx[i], vt_idx[i + 1]))
+                    face_normals.append((vn_idx[0], vn_idx[i], vn_idx[i + 1]))
                 
-            elif components[0] == 'l':
+            elif parts[0] == 'l':
                 # Parse face indices (assuming triangular faces)
-                line = tuple(map(int, components[1:3]))
-                lines.append(line)
-            
-            elif components[0] == 'vn':
-                vertice_normal = tuple(map(float, components[1:4]))
-                vertice_normals.append(vertice_normal)
+                # line = tuple(map(int, parts[1:3]))
+                # lines.append(line)
+                if len(parts) >= 3:
+                    indices = [int(p.split("/")[0]) - 1 for p in parts[1:]]
+                    for i in range(len(indices) - 1):
+                        lines.append((indices[i], indices[i + 1]))                
 
     return {
-        'vertices': np.array(vertices), 
-        'faces': np.array(faces) - 1, 
-        'lines': np.array(lines) - 1,
-        'v_normals': np.array(vertice_normals)}
+        "xyz": np.array(xyz, dtype=np.float32),
+        "uv": np.array(uv, dtype=np.float32),
+        "v_normals": np.array(vertice_normals, dtype=np.float32),
+        "faces_xyz": np.array(faces_xyz, dtype=np.int32) if faces_xyz else np.empty((0, 3), dtype=np.int32),
+        "faces_uv": np.array(faces_uv, dtype=np.int32) if faces_uv else np.empty((0, 3), dtype=np.int32),
+        "face_normals": np.array(face_normals, dtype=np.int32) if face_normals else np.empty((0, 3), dtype=np.int32),
+        "lines": np.array(lines, dtype=np.int32) if lines else np.empty((0, 2), dtype=np.int32),
+    }
 
 def write_obj_file(file_path, vertices, faces=None, vtx_colors=None, is_line=False, is_point=False):
     """
@@ -195,6 +238,6 @@ def save_obj_parts_with_uv(
 if __name__=="__main__":
     # Example usage
     vertices = [(1, 2, 3), (5, 4, 6), (9, 8, 7)]
-    faces = [(0, 1, 2)]
+    faces_xyz = [(0, 1, 2)]
     uvs = [(0.5, 0.5), (0.75, 0.5), (0.75, 0.75)]
-    save_obj_with_uv('example.obj', vertices, uvs, faces, faces_uv=faces)
+    save_obj_with_uv('example.obj', vertices, uvs, faces_xyz, faces_uv=faces_xyz)
