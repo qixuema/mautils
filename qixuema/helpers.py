@@ -4,7 +4,7 @@ import sys
 import re
 import string
 from pathlib import Path
-import datetime
+from datetime import datetime
 import json
 import time
 import functools
@@ -486,6 +486,24 @@ def make_safe_filename(
         return f"{safe_name_part}.{ext_part}"
     else:
         return safe_name_part
+
+def is_modified_after(file_path: str, dt: datetime) -> bool:
+    """
+    判断文件是否在指定时间之后被修改。
+    
+    参数:
+        file_path (str): 文件路径
+        dt (datetime): 参考时间
+    
+    返回:
+        bool: 如果文件在指定时间之后修改，则返回 True，否则 False
+    """
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"文件不存在: {file_path}")
+
+    file_time = datetime.fromtimestamp(path.stat().st_mtime)
+    return file_time > dt
 
 
 if __name__ == '__main__':
