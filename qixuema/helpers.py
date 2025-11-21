@@ -502,7 +502,7 @@ def is_modified_after(file_path: str, dt: datetime) -> bool:
     if not path.exists():
         raise FileNotFoundError(f"文件不存在: {file_path}")
 
-    file_time = datetime.fromtimestamp(path.stat().st_mtime)
+    file_time = datetime.fromtimestamp(path.stat().st_mtime, tz=dt.tzinfo)
     return file_time > dt
 
 

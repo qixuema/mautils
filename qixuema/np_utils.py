@@ -655,3 +655,14 @@ def order_and_sort_edges(seam_edges: np.ndarray) -> np.ndarray:
     idx = np.lexsort((a[:, 1], a[:, 0]))  # 先按第一列，再按第二列
     return a[idx]
 
+
+def np_pad_to(arr, shape, fill=0):
+    arr = np.asarray(arr)
+    out = np.full(shape, fill, dtype=arr.dtype)
+    # assert arr.shape[0] <= shape[0], f"arr length {arr.shape[0]} is greater than shape[0] {shape[0]}"
+    if arr.shape[0] > shape[0]:
+        arr = arr[:shape[0]]
+    
+    slices = tuple(slice(0, min(s, arr.shape[i])) for i, s in enumerate(shape))
+    out[slices] = arr[slices]
+    return out

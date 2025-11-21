@@ -1,5 +1,7 @@
 import numpy as np
 import trimesh
+from typing import List, Tuple
+
 from trimesh.creation import cylinder
 from shapely.geometry import Polygon
 
@@ -288,3 +290,33 @@ def uniform_pc_sampling(mesh, pc_num_total=20480):
     pc_normal = np.concatenate([points, normals], axis=-1, dtype=np.float16)
 
     return pc_normal
+
+
+def _iter_scene_meshes(scene: trimesh.Scene) -> List[Tuple[str, trimesh.Trimesh]]:
+    """
+    Iterate meshes in a Scene with world transforms applied.
+    Returns list of (instance_name, mesh_in_world).
+    If multiple nodes reference the same geometry, each instance is returned.
+    """
+    meshes: List[Tuple[str, trimesh.Trimesh]] = []
+
+    for node_name in scene.graph.nodes_geometry:
+        attrs = scene.graph.transforms.node_data.get(node_name, {})        
+        geom_name = attrs.get("geometry")
+        if not geom_name or geom_name not in scene.geometry:
+            continue
+                
+        base = scene.geometry[geom_name]
+        # copy to avoid mutating original
+        m = base.copy()
+        # apply node's world transform
+        T, _ = scene.graph.get(node_name)  # 4x4
+        if T is not None:
+            try:
+                m.apply_transform(T)
+            except Exception as e:
+                print(f"[apply_transform] failed: {e}; skip")
+                continue
+        instance_name = node_name or geom_name
+        meshes.append((instance_name, m))
+    return meshes

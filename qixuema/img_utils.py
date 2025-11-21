@@ -173,3 +173,70 @@ def save_image2(img_np, out_path: str, jpg_quality: int = 90):
         img.save(out_path, quality=jpg_quality, method=6)
     else:
         print(f"Unsupported format {fmt}. Use jpg/webp.")
+
+
+def resize_image(img, size, mode="bilinear"):
+    """
+    简单的 numpy 图像缩放接口。
+    参数:
+        img  : numpy.ndarray, 形状 (H,W) 或 (H,W,C), dtype 任意 (常见 float32)
+        size : (new_h, new_w)
+        mode : 目前支持 "bilinear" 和 "nearest"
+    返回:
+        resized_img: numpy.ndarray, 形状 (new_h, new_w) 或 (new_h, new_w, C)
+    """
+    img = np.asarray(img)
+    assert img.ndim in (2, 3), "img 必须是 HxW 或 HxWxC"
+
+    new_h, new_w = size
+    if img.ndim == 2:
+        img = img[..., None]
+        squeeze = True
+    else:
+        squeeze = False
+
+    h, w, c = img.shape
+
+    if mode == "nearest":
+        # 最近邻插值
+        ys = np.linspace(0, h - 1, new_h)
+        xs = np.linspace(0, w - 1, new_w)
+        yi = np.clip(np.round(ys).astype(int), 0, h - 1)
+        xi = np.clip(np.round(xs).astype(int), 0, w - 1)
+        out = img[yi[:, None], xi[None, :]]  # (new_h,new_w,c)
+
+    elif mode == "bilinear":
+        # 双线性插值
+        ys = np.linspace(0, h - 1, new_h)
+        xs = np.linspace(0, w - 1, new_w)
+        xv, yv = np.meshgrid(xs, ys)
+
+        x0 = np.floor(xv).astype(int)
+        x1 = np.clip(x0 + 1, 0, w - 1)
+        y0 = np.floor(yv).astype(int)
+        y1 = np.clip(y0 + 1, 0, h - 1)
+
+        Ia = img[y0, x0]  # top-left
+        Ib = img[y0, x1]  # top-right
+        Ic = img[y1, x0]  # bottom-left
+        Id = img[y1, x1]  # bottom-right
+
+        # 权重
+        wa = (x1 - xv) * (y1 - yv)
+        wb = (xv - x0) * (y1 - yv)
+        wc = (x1 - xv) * (yv - y0)
+        wd = (xv - x0) * (yv - y0)
+
+        wa = wa[..., None]
+        wb = wb[..., None]
+        wc = wc[..., None]
+        wd = wd[..., None]
+
+        out = Ia * wa + Ib * wb + Ic * wc + Id * wd
+    else:
+        raise ValueError(f"Unsupported mode: {mode}")
+
+    if squeeze:
+        out = out[..., 0]
+
+    return out
