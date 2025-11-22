@@ -666,3 +666,76 @@ def np_pad_to(arr, shape, fill=0):
     slices = tuple(slice(0, min(s, arr.shape[i])) for i, s in enumerate(shape))
     out[slices] = arr[slices]
     return out
+
+def pad_to_canvas(
+    img: np.ndarray,
+    out_h: int,
+    out_w: int | None = None,
+    pad_value: float = 0.0,
+) -> np.ndarray:
+    """
+    将图像居中放置到指定画布大小 (out_h, out_w)，四周用 pad_color 填充。
+    如果 out_w 为 None, 则默认做成正方形画布 out_h x out_h。
+    """
+    if out_w is None:
+        out_w = out_h
+
+    h, w = img.shape[:2]
+    if h > out_h or w > out_w:
+        raise ValueError(f"target size ({out_h}, {out_w}) smaller than image ({h}, {w})")
+
+    # 需要填充的总量
+    pad_h = out_h - h
+    pad_w = out_w - w
+
+    # 上下 / 左右分配（尽量居中）
+    top = pad_h // 2
+    bottom = pad_h - top
+    left = pad_w // 2
+    right = pad_w - left
+
+    if img.ndim == 3:
+        pad_width = ((top, bottom), (left, right), (0, 0))
+    else:
+        pad_width = ((top, bottom), (left, right))
+
+    return np.pad(
+        img,
+        pad_width=pad_width,
+        mode="constant",
+        constant_values=pad_value
+    )
+    
+def resize_numpy_nn(
+    img: np.ndarray,
+    scale: float | None = None,
+    size: tuple[int, int] | None = None,
+) -> np.ndarray:
+    """
+    纯 numpy 实现的最近邻缩放：
+    - img: (H, W, C) 或 (H, W)
+    - scale: 按比例缩放
+    - size: (out_h, out_w)，指定输出大小
+    二选一: scale 或 size 必须提供一个。
+    """
+    if (scale is None) == (size is None):
+        raise ValueError("必须二选一：要么指定 scale，要么指定 size")
+
+    in_h, in_w = img.shape[:2]
+
+    if size is not None:
+        out_h, out_w = size
+    else:
+        out_h = max(1, int(in_h * scale))
+        out_w = max(1, int(in_w * scale))
+
+    # 计算输出网格对应到输入的坐标（最近邻）
+    # 这里使用 np.linspace 覆盖 [0, in_h) / [0, in_w) 区间
+    row_coords = (np.linspace(0, in_h - 1, out_h)).astype(np.int64)
+    col_coords = (np.linspace(0, in_w - 1, out_w)).astype(np.int64)
+
+    # 利用广播构造索引网格
+    out = img[row_coords[:, None], col_coords[None, ...]]
+
+    return out
+    
