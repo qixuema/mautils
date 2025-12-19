@@ -361,9 +361,11 @@ def polyline_length(polyline: np.ndarray) -> float:
     seg_lengths = np.linalg.norm(diffs, axis=1)
     return np.sum(seg_lengths)
 
-def boundary_vertex_indices(faces: np.ndarray) -> np.ndarray:
+
+
+def boundary_edges(faces: np.ndarray) -> np.ndarray:
     """
-    返回边界顶点的索引 (升序、唯一) 。
+    返回边界边。
     faces_idx: (M,3) 三角形面片的顶点索引 (int), 要求是 unique 的
     """
     if faces.size == 0:
@@ -383,10 +385,19 @@ def boundary_vertex_indices(faces: np.ndarray) -> np.ndarray:
     uniq_edges, counts = np.unique(edges, axis=0, return_counts=True)
 
     # 4) 边界边 (只出现 1 次) 
-    boundary_edges = uniq_edges[counts == 1]
+    _boundary_edges = uniq_edges[counts == 1]
+
+    return _boundary_edges
+
+def boundary_vertex_indices(faces: np.ndarray) -> np.ndarray:
+    """
+    返回边界顶点的索引 (升序、唯一) 。
+    faces_idx: (M,3) 三角形面片的顶点索引 (int), 要求是 unique 的
+    """
+    _boundary_edges = boundary_edges(faces)
 
     # 5) 边界顶点 = 边界边的端点集合
-    boundary_vtx_idxes = np.unique(boundary_edges.ravel())
+    boundary_vtx_idxes = np.unique(_boundary_edges.ravel())
 
     return boundary_vtx_idxes
 
@@ -659,7 +670,6 @@ def order_and_sort_edges(seam_edges: np.ndarray) -> np.ndarray:
 def np_pad_to(arr, shape, fill=0):
     arr = np.asarray(arr)
     out = np.full(shape, fill, dtype=arr.dtype)
-    # assert arr.shape[0] <= shape[0], f"arr length {arr.shape[0]} is greater than shape[0] {shape[0]}"
     if arr.shape[0] > shape[0]:
         arr = arr[:shape[0]]
     
@@ -738,4 +748,3 @@ def resize_numpy_nn(
     out = img[row_coords[:, None], col_coords[None, ...]]
 
     return out
-    
