@@ -10,7 +10,7 @@ dependencies = [
     "einops>=0.8.0",
     "packaging>=21.0",
     "deprecated>=1.2.14",
-    "numpy==1.26.0",
+    "numpy", # 1.26.0 for open3d
     "pyyaml>=6.0.1",
 ]
 
