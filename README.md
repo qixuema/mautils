@@ -12,7 +12,7 @@ rm -rf build dist *.egg-info
 
 install and update build tools
 ```
-pip install -U packaging
+uv pip install -U packaging
 ```
 
 build
