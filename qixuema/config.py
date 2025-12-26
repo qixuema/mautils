@@ -1,4 +1,5 @@
 import yaml
+import os
 
 class NestedDictToClass:
     def __init__(self, dictionary):
@@ -34,6 +35,10 @@ def load_config(path, default_path=None):
     # If yes, load this config first as default
     # If no, use the default_path
     if inherit_from is not None:
+       # [新增] 支持相对路径：相对于当前配置文件的目录
+        if not os.path.isabs(inherit_from):
+            inherit_from = os.path.join(os.path.dirname(path), inherit_from)
+        
         cfg = load_config(inherit_from, default_path)
     elif default_path is not None:
         with open(default_path, 'r') as f:
