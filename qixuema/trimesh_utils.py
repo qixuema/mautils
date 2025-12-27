@@ -36,8 +36,9 @@ def create_colored_prism_segment(s_p, e_p, radius=0.1, color=(1,0,0), n_sides=5)
     mesh.visual.vertex_colors = np.tile(_rgba255(color), (mesh.vertices.shape[0], 1))
     return mesh
 
-def segments_to_prisms(segments, base_mesh=None, radius=0.01, n_sides=5,
-                       random_colors=False, color=(1,0,0)):
+def segments_to_prisms(
+    segments, base_mesh=None, radius=0.01, n_sides=5,
+    color=(1,0,0), color_scheme='rainbow'):
     """
     将 segments 转换为棱柱 mesh, 并可选与 base_mesh 合并.
 
@@ -47,7 +48,8 @@ def segments_to_prisms(segments, base_mesh=None, radius=0.01, n_sides=5,
         radius: 棱柱半径
         n_sides: 棱柱边数 (5=五棱柱)
         random_colors: 是否随机颜色
-        default_color: 非随机颜色时使用的 RGB (0~1)
+        color: 非随机颜色时使用的 RGB (0~1)
+        color_scheme: 'rainbow' 为彩虹渐变色
 
     Returns:
         trimesh.Trimesh 合并后的网格
@@ -58,10 +60,34 @@ def segments_to_prisms(segments, base_mesh=None, radius=0.01, n_sides=5,
     if base_mesh is not None:
         meshes.append(base_mesh)
 
+    n_segments = len(segments)
+
     # 每个 segment 生成一个棱柱
-    for seg in segments:
+    for i, seg in enumerate(segments):
         s_p, e_p = seg
-        chain_color = np.random.rand(3) if random_colors else color
+
+        if color_scheme == 'rainbow':
+            # 使用彩虹色谱
+            ratio = i / max(n_segments - 1, 1)
+
+            # 彩虹色谱映射：红→黄→绿→青→蓝→紫
+            if ratio < 0.17:  # 红色区域
+                chain_color = np.array([1.0, ratio * 6, 0.0])
+            elif ratio < 0.33:  # 红色到黄色
+                chain_color = np.array([1.0, 0.5 + (ratio - 0.17) * 3, 0.0])
+            elif ratio < 0.5:  # 黄色到绿色
+                chain_color = np.array([1.0 - (ratio - 0.33) * 3, 1.0, 0.0])
+            elif ratio < 0.67:  # 绿色到青色
+                chain_color = np.array([0.0, 1.0, (ratio - 0.5) * 6])
+            elif ratio < 0.83:  # 青色到蓝色
+                chain_color = np.array([0.0, 1.0 - (ratio - 0.67) * 3, 1.0])
+            else:  # 蓝色到紫色
+                chain_color = np.array([(ratio - 0.83) * 6, 0.0, 1.0])
+
+            chain_color = np.clip(chain_color, 0, 1)
+        else:
+            chain_color = color
+
         prism = create_colored_prism_segment(s_p, e_p, radius=radius, color=chain_color, n_sides=n_sides)
         if prism is not None:
             meshes.append(prism)
