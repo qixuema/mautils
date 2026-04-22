@@ -33,7 +33,7 @@ def save_image(image_numpy: np.ndarray, image_path: str, aspect_ratio: float = 1
     """
     Save a numpy image to disk.
     - Supports HxW, HxWx1, HxWx3, HxWx4
-    - If float not in [0,1], min–max normalize per channel to uint8
+    - If float not in [0,1], min-max normalize per channel to uint8
     - aspect_ratio scales width: new_w = round(w * aspect_ratio); height unchanged
     """
     Path(image_path).parent.mkdir(parents=True, exist_ok=True)
@@ -49,63 +49,6 @@ def save_image(image_numpy: np.ndarray, image_path: str, aspect_ratio: float = 1
             img_u8 = img_u8[..., 0]
     else:
         raise ValueError(f"Unsupported shape {img.shape}. Use split-save for C not in (1,3,4).")
-
-    H, W = img_u8.shape[:2]
-    im = Image.fromarray(img_u8, mode=mode)
-
-    if aspect_ratio != 1.0:
-        new_w = max(1, int(round(W * aspect_ratio)))
-        new_h = H
-        im = im.resize((new_w, new_h), Image.BICUBIC)
-
-    im.save(image_path)
-
-def _to_uint8(arr: np.ndarray) -> np.ndarray:
-    """Convert to uint8. If float and not in [0,1], do per-channel min-max."""
-    x = np.asarray(arr)
-    if x.dtype == np.uint8:
-        return x
-    if x.ndim == 2:
-        x = x[..., None]
-    x = x.astype(np.float32)
-    vmin = np.nanmin(x)
-    vmax = np.nanmax(x)
-    if np.isfinite(vmin) and np.isfinite(vmax) and 0.0 <= vmin and vmax <= 1.0:
-        y = x * 255.0
-    else:
-        y = np.empty_like(x)
-        for c in range(x.shape[-1]):
-            xc = x[..., c]
-            cmin, cmax = np.nanmin(xc), np.nanmax(xc)
-            if not np.isfinite(cmin) or not np.isfinite(cmax) or cmax == cmin:
-                yc = np.zeros_like(xc)
-            else:
-                yc = (xc - cmin) / (cmax - cmin) * 255.0
-            y[..., c] = yc
-    y = np.nan_to_num(y, nan=0.0, posinf=255.0, neginf=0.0).clip(0, 255).astype(np.uint8)
-    return y
-
-def save_image(image_numpy: np.ndarray, image_path: str, aspect_ratio: float = 1.0):
-    """
-    Save a numpy image to disk.
-    - Supports HxW, HxWx1, HxWx3, HxWx4
-    - If float not in [0,1], min–max normalize per channel to uint8
-    - aspect_ratio scales width: new_w = round(w * aspect_ratio); height unchanged
-    """
-    Path(image_path).parent.mkdir(parents=True, exist_ok=True)
-
-    img = np.asarray(image_numpy)
-    if img.ndim == 2:
-        mode = "L"
-        img_u8 = _to_uint8(img)[..., 0]
-    elif img.ndim == 3 and img.shape[2] in (1, 3, 4):
-        img_u8 = _to_uint8(img)
-        mode = {1: "L", 3: "RGB", 4: "RGBA"}[img_u8.shape[2]]
-        if img_u8.shape[2] == 1:
-            img_u8 = img_u8[..., 0]
-    else:
-        # raise ValueError(f"Unsupported shape {img.shape}. Use split-save for C not in (1,3,4).")
-        print(f"Unsupported shape {img.shape}. Use split-save for C not in (1,3,4).")
 
     H, W = img_u8.shape[:2]
     im = Image.fromarray(img_u8, mode=mode)

@@ -62,7 +62,6 @@ def plot_frequency_distribution(
 
     if discrete:
         counts = Counter(arr.tolist())
-        counts = Counter(arr.tolist())
         values, freqs = zip(*sorted(counts.items()))
         if relative:
             total = sum(freqs)
@@ -86,11 +85,9 @@ def plot_frequency_distribution(
     ax.set_title(title or ("Frequency Distribution" if not relative else "Relative Frequency Distribution"))
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    
-    # 设置y轴为对数坐标（如果启用）
+
     if log_y:
         ax.set_yscale('log')
-        # 更新ylabel以反映对数坐标
         if ylabel == "Frequency":
             ylabel = "Frequency (log scale)"
         elif ylabel == "Relative Frequency":
@@ -108,7 +105,7 @@ def plot_frequency_distribution(
 
 
 def process_and_plot_feature(
-    key, meta_data, 
+    key, meta_data,
     save_dir='../results',
     clip_threshold=95,
     log_y=False,
@@ -117,31 +114,25 @@ def process_and_plot_feature(
 
     new_data = np.array(feat_list).astype(np.float32)
     new_data = new_data[new_data >= 0.0]
-    new_data += 1e-2  # 避免 log(0) 或极小值问题
+    new_data += 1e-2  # Avoid log(0) and very small values.
 
     print(f"\n==== Key: {key} ====")
-    print("原始长度:", len(feat_list))
-    print("均值:", np.mean(feat_list))
-    print("标准差:", np.std(feat_list))
-    print("最小值:", np.min(feat_list))
-    print("最大值:", np.max(feat_list))
+    print(f"Original length: {len(feat_list)}")
+    print(f"Mean: {np.mean(feat_list)}")
+    print(f"Std: {np.std(feat_list)}")
+    print(f"Min: {np.min(feat_list)}")
+    print(f"Max: {np.max(feat_list)}")
 
-    # 截断高端异常值
     threshold = np.percentile(new_data, clip_threshold)
-    print(f"截断阈值: {threshold:.4f}")
+    print(f"Clip threshold: {threshold:.4f}")
     new_data = new_data[new_data < threshold]
-    print("截断后长度:", len(new_data))
+    print(f"Length after clipping: {len(new_data)}")
 
-    # 绘图
     ax = plot_frequency_distribution(
         new_data, bins=100, title=f'{key} distribution',
         xlabel=key,
         save_path=f'{save_dir}/{key}-distribution.png',
         log_y=log_y,
     )
-
-    # 可选：强制 Y 轴是整数
-    # from matplotlib.ticker import MaxNLocator
-    # ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
     return ax

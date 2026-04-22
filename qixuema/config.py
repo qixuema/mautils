@@ -4,17 +4,14 @@ import os
 class NestedDictToClass:
     def __init__(self, dictionary):
         self._convert(dictionary)
-    
+
     def _convert(self, dictionary):
         for key, value in dictionary.items():
-            # 对嵌套的字典进行递归处理
             if isinstance(value, dict):
                 value = NestedDictToClass(value)
-            # 对列表进行转换
             elif isinstance(value, list):
                 value = tuple(value)
 
-            # 设置属性
             setattr(self, key.lower(), value)
 
 # General config
@@ -35,14 +32,14 @@ def load_config(path, default_path=None):
     # If yes, load this config first as default
     # If no, use the default_path
     if inherit_from is not None:
-       # [新增] 支持相对路径：相对于当前配置文件的目录
+        # Support relative paths: relative to the directory of the current config file.
         if not os.path.isabs(inherit_from):
             inherit_from = os.path.join(os.path.dirname(path), inherit_from)
-        
+
         cfg = load_config(inherit_from, default_path)
     elif default_path is not None:
         with open(default_path, 'r') as f:
-            cfg = yaml.load(f)
+            cfg = yaml.safe_load(f)
     else:
         cfg = dict()
 
@@ -71,8 +68,8 @@ def update_recursive(dict1, dict2):
 def print_custom_attributes(obj, indent=''):
     attributes = vars(obj)
     for attr, value in attributes.items():
-        if not attr.startswith("__"):  # 排除特殊属性
-            if isinstance(value, (dict, list, tuple)):  # 递归打印字典属性
+        if not attr.startswith("__"):
+            if isinstance(value, (dict, list, tuple)):
                 print(f"{indent}{attr}:")
                 print_custom_attributes(value, indent + "  ")
             else:
