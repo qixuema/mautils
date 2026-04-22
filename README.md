@@ -1,44 +1,32 @@
 ## mautils
 utils for saving my life
 
-```
+```bash
 pip install qixuema -i https://pypi.org/simple
 ```
 
-Clean up old build files
-```
+### Development & Release
+
+This project uses `uv` for dependency management and building.
+
+**1. Clean up old build files**
+```bash
 rm -rf build dist *.egg-info
 ```
 
-install and update build tools
-```
-uv pip install -U packaging
-```
-
-build
-```
-python -m build
-```
-Upgrade twine to the latest version
-```
-pip install --upgrade twine
+**2. Build the package**
+```bash
+uv build
 ```
 
-check
-```
-twine check dist/*
-```
-
-Upload the package to PyPI
-```
-twine upload dist/*
-```
-Upgrade and install the package
-```
-pip install --upgrade qixuema -i https://pypi.org/simple
+**3. Publish to PyPI**
+```bash
+uv publish
 ```
 
-install on local
-```
-python -m pip install -e . 
+*Note: `uv publish` handles both checking and uploading. It will prompt for your PyPI token if not set via environment variable.*
+
+**Install locally for development**
+```bash
+uv pip install -e ".[dev]"
 ```
