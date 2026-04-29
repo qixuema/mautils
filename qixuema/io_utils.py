@@ -12,86 +12,187 @@ def read_vertices_obj(filename):
                 vertices.append([float(coord) for coord in parts[1:4]])
     return np.array(vertices)
 
+def _bulk_floats(payloads, ncols, dtype):
+    if not payloads:
+        return np.empty((0, ncols), dtype=dtype)
+    arr = np.fromstring(' '.join(payloads), sep=' ', dtype=dtype)
+    if arr.size == len(payloads) * ncols:
+        return arr.reshape(-1, ncols)
+    return np.array([line.split()[:ncols] for line in payloads], dtype=dtype)
+
+
+def _triangulate_int_lines(payloads):
+    if all(line.count(' ') == 2 for line in payloads):
+        arr = np.fromstring(' '.join(payloads), sep=' ', dtype=np.int32) - 1
+        return arr.reshape(-1, 3)
+    out = []
+    for line in payloads:
+        idx = [int(p) - 1 for p in line.split()]
+        for i in range(1, len(idx) - 1):
+            out.append((idx[0], idx[i], idx[i + 1]))
+    return np.array(out, dtype=np.int32) if out else np.empty((0, 3), dtype=np.int32)
+
+
+def _parse_faces(f_lines):
+    empty = lambda: np.empty((0, 3), dtype=np.int32)
+    if not f_lines:
+        return empty(), empty(), empty()
+
+    if not any('/' in line for line in f_lines):
+        return _triangulate_int_lines(f_lines), empty(), empty()
+
+    faces_xyz_l, faces_uv_l, face_normals_l = [], [], []
+    for line in f_lines:
+        v_idx, vt_idx, vn_idx = [], [], []
+        for tok in line.split():
+            sub = tok.split('/')
+            vi = int(sub[0]) - 1 if sub[0] else -1
+            ti = int(sub[1]) - 1 if len(sub) > 1 and sub[1] else -1
+            ni = int(sub[2]) - 1 if len(sub) > 2 and sub[2] else -1
+            v_idx.append(vi); vt_idx.append(ti); vn_idx.append(ni)
+        for i in range(1, len(v_idx) - 1):
+            faces_xyz_l.append((v_idx[0], v_idx[i], v_idx[i + 1]))
+            faces_uv_l.append((vt_idx[0], vt_idx[i], vt_idx[i + 1]))
+            face_normals_l.append((vn_idx[0], vn_idx[i], vn_idx[i + 1]))
+
+    return (
+        np.array(faces_xyz_l, dtype=np.int32) if faces_xyz_l else empty(),
+        np.array(faces_uv_l, dtype=np.int32) if faces_uv_l else empty(),
+        np.array(face_normals_l, dtype=np.int32) if face_normals_l else empty(),
+    )
+
+
+def _parse_line_segments(l_lines):
+    if not l_lines:
+        return np.empty((0, 2), dtype=np.int32)
+    if all(line.count(' ') == 1 and '/' not in line for line in l_lines):
+        arr = np.fromstring(' '.join(l_lines), sep=' ', dtype=np.int32) - 1
+        return arr.reshape(-1, 2)
+    out = []
+    for line in l_lines:
+        idx = [int(p.split('/')[0]) - 1 for p in line.split()]
+        for i in range(len(idx) - 1):
+            out.append((idx[i], idx[i + 1]))
+    return np.array(out, dtype=np.int32) if out else np.empty((0, 2), dtype=np.int32)
+
+
 def read_obj(file_path):
     """
     Read an OBJ file and extract vertices, UVs, normals, faces, and lines.
 
     Returns:
         dict with:
-            - xyz: (N, 3)
-            - uv: (M, 2)
-            - v_normals: (K, 3)
-            - faces_xyz: (F, 3) vertex indices (0-based)
-            - faces_uv: (F, 3) uv indices (0-based, or -1 if missing)
-            - lines: (L, 2) line indices (0-based)
-    """    
-    xyz = []
-    uv = []
-    faces_xyz = []
-    faces_uv = []
-    face_normals = []
-    lines = []
-    vertice_normals = []
+            - xyz: (N, 3) float32
+            - uv: (M, 2) float32
+            - v_normals: (K, 3) float32
+            - faces_xyz: (F, 3) int32 vertex indices (0-based)
+            - faces_uv: (F, 3) int32 uv indices (0-based, or -1 if missing)
+            - face_normals: (F, 3) int32 normal indices (0-based, or -1 if missing)
+            - lines: (L, 2) int32 segment indices (0-based)
+    """
+    with open(file_path, 'r') as fp:
+        text = fp.read()
 
-    with open(file_path, 'r') as file:
-        for line in file:
-            if not line.strip() or line.startswith("#"):
-                continue
-                        
-            parts = line.strip().split()
+    v_lines, vt_lines, vn_lines, f_lines, l_lines = [], [], [], [], []
+    for line in text.splitlines():
+        if not line or line[0] == '#':
+            continue
+        if line.startswith('v '):
+            v_lines.append(line[2:])
+        elif line.startswith('vt '):
+            vt_lines.append(line[3:])
+        elif line.startswith('vn '):
+            vn_lines.append(line[3:])
+        elif line.startswith('f '):
+            f_lines.append(line[2:])
+        elif line.startswith('l '):
+            l_lines.append(line[2:])
 
-            if not parts:
-                continue
-
-            if parts[0] == 'v':
-                # Parse vertex coordinates
-                vertex = tuple(map(float, parts[1:4]))
-                xyz.append(vertex)
-
-            elif parts[0] == "vt":
-                # UV can be 2D or 3D (u,v[,w]) → usually only u,v
-                uv.append(tuple(map(float, parts[1:3])))                
-
-            elif parts[0] == "vn":
-                vertice_normals.append(tuple(map(float, parts[1:4])))
-
-            elif parts[0] == 'f':
-                v_idx, vt_idx, vn_idx = [], [], []
-                for v in parts[1:]:
-                    tokens = v.split("/")
-                    # handle v, v/vt, v//vn, v/vt/vn cases
-                    vi = int(tokens[0]) - 1 if tokens[0] else -1
-                    ti = int(tokens[1]) - 1 if len(tokens) > 1 and tokens[1] else -1
-                    ni = int(tokens[2]) - 1 if len(tokens) > 2 and tokens[2] else -1
-
-                    v_idx.append(vi)
-                    vt_idx.append(ti)
-                    vn_idx.append(ni)
-
-                # triangulate faces with >3 vertices
-                for i in range(1, len(v_idx) - 1):
-                    faces_xyz.append((v_idx[0], v_idx[i], v_idx[i + 1]))
-                    faces_uv.append((vt_idx[0], vt_idx[i], vt_idx[i + 1]))
-                    face_normals.append((vn_idx[0], vn_idx[i], vn_idx[i + 1]))
-                
-            elif parts[0] == 'l':
-                # Parse face indices (assuming triangular faces)
-                # line = tuple(map(int, parts[1:3]))
-                # lines.append(line)
-                if len(parts) >= 3:
-                    indices = [int(p.split("/")[0]) - 1 for p in parts[1:]]
-                    for i in range(len(indices) - 1):
-                        lines.append((indices[i], indices[i + 1]))                
+    faces_xyz, faces_uv, face_normals = _parse_faces(f_lines)
 
     return {
-        "xyz": np.array(xyz, dtype=np.float32),
-        "uv": np.array(uv, dtype=np.float32),
-        "v_normals": np.array(vertice_normals, dtype=np.float32),
-        "faces_xyz": np.array(faces_xyz, dtype=np.int32) if faces_xyz else np.empty((0, 3), dtype=np.int32),
-        "faces_uv": np.array(faces_uv, dtype=np.int32) if faces_uv else np.empty((0, 3), dtype=np.int32),
-        "face_normals": np.array(face_normals, dtype=np.int32) if face_normals else np.empty((0, 3), dtype=np.int32),
-        "lines": np.array(lines, dtype=np.int32) if lines else np.empty((0, 2), dtype=np.int32),
+        "xyz": _bulk_floats(v_lines, 3, np.float32),
+        "uv": _bulk_floats(vt_lines, 2, np.float32),
+        "v_normals": _bulk_floats(vn_lines, 3, np.float32),
+        "faces_xyz": faces_xyz,
+        "faces_uv": faces_uv,
+        "face_normals": face_normals,
+        "lines": _parse_line_segments(l_lines),
     }
+
+
+def _to_percent_fmt(brace_fmt: str) -> str:
+    if brace_fmt.startswith('{:') and brace_fmt.endswith('}'):
+        return '%' + brace_fmt[2:-1]
+    return brace_fmt
+
+
+def _format_faces(faces_xyz, faces_uv, face_normals, write_uv, write_vn) -> str:
+    if write_uv and write_vn and (faces_uv >= 0).all() and (face_normals >= 0).all():
+        v = (faces_xyz + 1).tolist()
+        t = (faces_uv + 1).tolist()
+        n = (face_normals + 1).tolist()
+        return '\n'.join(
+            f"f {v[i][0]}/{t[i][0]}/{n[i][0]} {v[i][1]}/{t[i][1]}/{n[i][1]} {v[i][2]}/{t[i][2]}/{n[i][2]}"
+            for i in range(len(v))
+        ) + '\n'
+    if write_uv and not write_vn and (faces_uv >= 0).all():
+        v = (faces_xyz + 1).tolist()
+        t = (faces_uv + 1).tolist()
+        return '\n'.join(
+            f"f {v[i][0]}/{t[i][0]} {v[i][1]}/{t[i][1]} {v[i][2]}/{t[i][2]}"
+            for i in range(len(v))
+        ) + '\n'
+    if write_vn and not write_uv and (face_normals >= 0).all():
+        v = (faces_xyz + 1).tolist()
+        n = (face_normals + 1).tolist()
+        return '\n'.join(
+            f"f {v[i][0]}//{n[i][0]} {v[i][1]}//{n[i][1]} {v[i][2]}//{n[i][2]}"
+            for i in range(len(v))
+        ) + '\n'
+    if not write_uv and not write_vn:
+        v = (faces_xyz + 1).tolist()
+        return '\n'.join(f"f {row[0]} {row[1]} {row[2]}" for row in v) + '\n'
+    return _format_faces_mixed(faces_xyz, faces_uv, face_normals, write_uv, write_vn)
+
+
+def _format_faces_mixed(faces_xyz, faces_uv, face_normals, write_uv, write_vn) -> str:
+    fx = (faces_xyz + 1).tolist()
+    fu = (faces_uv + 1).tolist() if write_uv else None
+    fn = (face_normals + 1).tolist() if write_vn else None
+    out = []
+    for i in range(len(fx)):
+        toks = []
+        for c in range(3):
+            v_idx = fx[i][c]
+            ti = fu[i][c] if write_uv and fu[i][c] >= 1 else None
+            ni = fn[i][c] if write_vn and fn[i][c] >= 1 else None
+            if ti is None and ni is None:
+                toks.append(str(v_idx))
+            elif ti is None:
+                toks.append(f"{v_idx}//{ni}")
+            elif ni is None:
+                toks.append(f"{v_idx}/{ti}")
+            else:
+                toks.append(f"{v_idx}/{ti}/{ni}")
+        out.append('f ' + ' '.join(toks))
+    return '\n'.join(out) + '\n'
+
+
+def _format_lines(lines: np.ndarray) -> str:
+    if lines.ndim == 2 and lines.shape[1] == 2:
+        idx = (lines + 1).tolist()
+        return '\n'.join(f"l {a} {b}" for a, b in idx) + '\n'
+    if lines.ndim == 2:
+        idx = (lines + 1).tolist()
+        return '\n'.join('l ' + ' '.join(map(str, row)) for row in idx if len(row) >= 2) + '\n'
+    out = []
+    for row in lines:
+        row = np.asarray(row).ravel()
+        if row.size < 2:
+            continue
+        out.append('l ' + ' '.join(str(int(x) + 1) for x in row))
+    return '\n'.join(out) + '\n' if out else ''
 
 
 def write_obj(
@@ -112,121 +213,69 @@ def write_obj(
             - faces_xyz: (F, 3) int32 (0-based)
             - faces_uv: (F, 3) int32 (0-based, or -1 if missing)
             - face_normals: (F, 3) int32 (0-based, or -1 if missing)
-            - lines: (L, 2) int32 (0-based)
-        float_fmt: formatting for floats (e.g., "{:.6f}")
-        write_header_comment: write a brief comment header
+            - lines: (L, >=2) int32 (0-based)
+        float_fmt: brace-style format for floats (e.g., "{:.6f}").
+        write_header_comment: write a brief comment header.
     """
-    xyz: np.ndarray = data.get("xyz", np.empty((0, 3), dtype=np.float32))
-    uv: np.ndarray = data.get("uv", np.empty((0, 2), dtype=np.float32))
-    v_normals: np.ndarray = data.get("v_normals", np.empty((0, 3), dtype=np.float32))
-    faces_xyz: np.ndarray = data.get("faces_xyz", np.empty((0, 3), dtype=np.int32))
-    faces_uv: np.ndarray = data.get("faces_uv", np.empty((0, 3), dtype=np.int32))
-    face_normals: np.ndarray = data.get("face_normals", np.empty((0, 3), dtype=np.int32))
-    lines: np.ndarray = data.get("lines", np.empty((0, 2), dtype=np.int32))
+    xyz = data.get("xyz", np.empty((0, 3), dtype=np.float32))
+    uv = data.get("uv", np.empty((0, 2), dtype=np.float32))
+    v_normals = data.get("v_normals", np.empty((0, 3), dtype=np.float32))
+    faces_xyz = data.get("faces_xyz", np.empty((0, 3), dtype=np.int32))
+    faces_uv = data.get("faces_uv", np.empty((0, 3), dtype=np.int32))
+    face_normals = data.get("face_normals", np.empty((0, 3), dtype=np.int32))
+    lines = data.get("lines", np.empty((0, 2), dtype=np.int32))
 
-    # Basic validations / shape normalization
     if xyz.size and xyz.shape[1] != 3:
         raise ValueError("xyz must be (N, 3).")
     if uv.size and uv.shape[1] < 2:
-        raise ValueError("uv must be (M, 2) or (M, >=2).")
+        raise ValueError("uv must be (M, >=2).")
     if v_normals.size and v_normals.shape[1] != 3:
         raise ValueError("v_normals must be (K, 3).")
     if faces_xyz.size and faces_xyz.shape[1] != 3:
         raise ValueError("faces_xyz must be (F, 3) triangles.")
     if faces_uv.size and faces_uv.shape != faces_xyz.shape:
-        # allow empty faces_uv; otherwise must align with faces_xyz
-        if faces_uv.size != 0:
-            raise ValueError("faces_uv must have shape (F, 3) matching faces_xyz.")
+        raise ValueError("faces_uv must have shape (F, 3) matching faces_xyz.")
     if face_normals.size and face_normals.shape != faces_xyz.shape:
-        if face_normals.size != 0:
-            raise ValueError("face_normals must have shape (F, 3) matching faces_xyz.")
-    if lines.size and lines.shape[1] < 2:
+        raise ValueError("face_normals must have shape (F, 3) matching faces_xyz.")
+    if lines.size and lines.ndim == 2 and lines.shape[1] < 2:
         raise ValueError("lines must be (L, >=2).")
+    if faces_xyz.size and (faces_xyz < 0).any():
+        raise ValueError("faces_xyz contains negative indices.")
 
     has_uv_faces = faces_uv.size != 0
     has_vn_faces = face_normals.size != 0
     has_vt_pool = uv.size != 0
     has_vn_pool = v_normals.size != 0
 
+    pct = _to_percent_fmt(float_fmt)
+    v_fmt = f"v {pct} {pct} {pct}"
+    vt_fmt = f"vt {pct} {pct}"
+    vn_fmt = f"vn {pct} {pct} {pct}"
+
     with open(file_path, "w", encoding="utf-8") as f:
         if write_header_comment:
             f.write("# Written by write_obj\n")
-            f.write(f"# V={xyz.shape[0]} VT={uv.shape[0]} VN={v_normals.shape[0]} "
-                    f"F={faces_xyz.shape[0]} L={lines.shape[0]}\n")
+            f.write(
+                f"# V={xyz.shape[0]} VT={uv.shape[0]} VN={v_normals.shape[0]} "
+                f"F={faces_xyz.shape[0]} L={lines.shape[0]}\n"
+            )
 
-        # v
-        for v in xyz:
-            f.write("v " + " ".join(float_fmt.format(x) for x in v[:3]) + "\n")
-
-        # vt
+        if xyz.size:
+            np.savetxt(f, np.ascontiguousarray(xyz[:, :3]), fmt=v_fmt)
         if has_vt_pool:
-            for t in uv:
-                # OBJ vt can be 2D or 3D; we write only first two (u,v)
-                f.write("vt " + " ".join(float_fmt.format(x) for x in t[:2]) + "\n")
-
-        # vn
+            np.savetxt(f, np.ascontiguousarray(uv[:, :2]), fmt=vt_fmt)
         if has_vn_pool:
-            for n in v_normals:
-                f.write("vn " + " ".join(float_fmt.format(x) for x in n[:3]) + "\n")
+            np.savetxt(f, np.ascontiguousarray(v_normals[:, :3]), fmt=vn_fmt)
 
-        # f (triangles)
-        F = faces_xyz.shape[0]
-        for i in range(F):
-            vi = faces_xyz[i]  # (3,)
-            # Defensive checks
-            if np.any(vi < 0):
-                raise ValueError("faces_xyz contains negative indices.")
-            tokens = []
-            for c in range(3):
-                v_idx = int(vi[c]) + 1  # OBJ is 1-based
+        if faces_xyz.size:
+            f.write(_format_faces(
+                faces_xyz, faces_uv, face_normals,
+                write_uv=has_uv_faces and has_vt_pool,
+                write_vn=has_vn_faces and has_vn_pool,
+            ))
 
-                # decide vt / vn per corner
-                ti = None
-                ni = None
-
-                if has_uv_faces and has_vt_pool:
-                    t_raw = int(faces_uv[i, c])
-                    if t_raw >= 0:
-                        ti = t_raw + 1
-
-                if has_vn_faces and has_vn_pool:
-                    n_raw = int(face_normals[i, c])
-                    if n_raw >= 0:
-                        ni = n_raw + 1
-
-                # assemble per-corner token
-                if ti is None and ni is None:
-                    token = f"{v_idx}"
-                elif ti is None and ni is not None:
-                    token = f"{v_idx}//{ni}"
-                elif ti is not None and ni is None:
-                    token = f"{v_idx}/{ti}"
-                else:
-                    token = f"{v_idx}/{ti}/{ni}"
-
-                tokens.append(token)
-
-            f.write("f " + " ".join(tokens) + "\n")
-
-        # l (polyline segments). Each row may contain 2+ indices; we support both.
         if lines.size:
-            # If lines is strictly (L,2), write pairs; if (L,>2), write polyline
-            if lines.ndim == 2:
-                for row in lines:
-                    row = np.asarray(row).ravel()
-                    if row.size < 2:
-                        continue
-                    # OBJ 'l' expects 1-based vertex indices
-                    idx_str = " ".join(str(int(x) + 1) for x in row)
-                    f.write("l " + idx_str + "\n")
-            else:
-                # Allow (variable-length) list of index arrays
-                for row in lines:
-                    row = np.asarray(row).ravel()
-                    if row.size < 2:
-                        continue
-                    idx_str = " ".join(str(int(x) + 1) for x in row)
-                    f.write("l " + idx_str + "\n")
+            f.write(_format_lines(lines))
 
 
 def write_obj_file(file_path, vertices, faces=None, vtx_colors=None, is_line=False, is_point=False):
