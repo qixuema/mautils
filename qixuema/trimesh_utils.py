@@ -104,6 +104,58 @@ def _regular_ngon_2d(n_sides: int, radius: float, start_angle: float = 0.0) -> n
     y = radius * np.sin(angles)
     return np.column_stack([x, y])  # (N,2)
 
+def _rotation_minimizing_frames(points: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """沿折线逐顶点传播正交坐标架 (tangent, normal, binormal)。
+
+    用 double-reflection 法 (Wang et al. 2008) 做旋转最小化框架 (RMF):
+    相邻顶点间截面坐标架的转角最小,扫掠出的管子不会在某个接头突然拧转
+    (per-segment 独立取框架 / sweep_polygon 在近共线段会翻转,即旧实现的病灶)。
+
+    Args:
+        points: (M,3),已去除重复相邻点。
+    Returns:
+        (t, n, b): 三个 (M,3) 数组,逐顶点单位正交。
+    """
+    pts = np.asarray(points, dtype=np.float64)
+    m = len(pts)
+    seg = pts[1:] - pts[:-1]
+    seg_t = seg / np.linalg.norm(seg, axis=1)[:, None]
+
+    # 顶点切向 = 相邻两段切向的角平分方向;180° 折返退化时退回入段方向
+    t = np.empty((m, 3))
+    t[0], t[-1] = seg_t[0], seg_t[-1]
+    if m > 2:
+        avg = seg_t[:-1] + seg_t[1:]
+        norm = np.linalg.norm(avg, axis=1)
+        bad = norm < 1e-8
+        avg[bad] = seg_t[:-1][bad]
+        norm[bad] = 1.0
+        t[1:-1] = avg / norm[:, None]
+
+    # 初始 normal:取与 t0 最不平行的坐标轴投影到垂面
+    axis = np.eye(3)[np.argmin(np.abs(t[0]))]
+    r0 = axis - t[0] * float(np.dot(axis, t[0]))
+    r0 /= np.linalg.norm(r0)
+
+    normals = np.empty((m, 3))
+    normals[0] = r0
+    for i in range(m - 1):
+        v1 = pts[i + 1] - pts[i]
+        c1 = float(np.dot(v1, v1))
+        r_l = normals[i] - (2.0 / c1) * float(np.dot(v1, normals[i])) * v1
+        t_l = t[i] - (2.0 / c1) * float(np.dot(v1, t[i])) * v1
+        v2 = t[i + 1] - t_l
+        c2 = float(np.dot(v2, v2))
+        r_n = r_l if c2 < 1e-12 else r_l - (2.0 / c2) * float(np.dot(v2, r_l)) * v2
+        # 抵抗浮点漂移:重新正交化
+        r_n = r_n - t[i + 1] * float(np.dot(r_n, t[i + 1]))
+        r_n /= np.linalg.norm(r_n)
+        normals[i + 1] = r_n
+
+    binormals = np.cross(t, normals)
+    return t, normals, binormals
+
+
 def polyline_to_prism(
     polyline: np.ndarray,
     *,
@@ -115,23 +167,92 @@ def polyline_to_prism(
     """
     沿 3D polyline 扫掠一个正 N 边形截面，生成连续棱柱（默认五棱柱）。
 
+    截面坐标架用旋转最小化框架 (RMF) 逐顶点传播,替代旧的
+    trimesh.creation.sweep_polygon —— 后者的框架在近共线/急转接头处会翻转,
+    表现为管子在某个连接位置突然拧转。
+
+    闭环 (polyline[0] == polyline[-1]) 会被无缝焊合:绕环一周的框架角度失配
+    先对 N 边形的 2π/N 旋转对称取模,残余角按弧长均摊到每个截面,整数倍部分
+    在缝合处用顶点索引偏移吸收 —— 环上任何位置都看不到拧转或接缝。
+
     Args:
         polyline: (M,3) 采样点 (至少2个)。
         n_sides:  截面边数（=5 即五棱柱）。
         radius:   截面外接圆半径。
         color:    顶点颜色 RGB [0,1]。
-        end_caps: 是否封住首尾 (默认 False).
+        end_caps: 开链时是否封住首尾。
     """
-    polyline = np.asarray(polyline, dtype=float)
-    if polyline.ndim != 2 or polyline.shape[1] != 3 or len(polyline) < 2:
+    pts = np.asarray(polyline, dtype=np.float64)
+    if pts.ndim != 2 or pts.shape[1] != 3 or len(pts) < 2:
         raise ValueError("polyline 需为 (M,3) 且 M>=2")
 
-    # 生成 2D 正 N 边形截面（XY 平面），交由 sweep_polygon 扫掠
-    polygon_2d = _regular_ngon_2d(n_sides=n_sides, radius=radius)
-    
-    polygon_2d = Polygon(polygon_2d)  # Convert numpy array to shapely Polygon
+    # 去掉重复相邻点(零长段会让框架传播除零)
+    keep = np.ones(len(pts), dtype=bool)
+    keep[1:] = np.linalg.norm(pts[1:] - pts[:-1], axis=1) > 1e-12
+    pts = pts[keep]
+    if len(pts) < 2:
+        raise ValueError("polyline 全部点重合")
 
-    mesh = trimesh.creation.sweep_polygon(polygon_2d, path=polyline, cap=end_caps)
+    closed = np.linalg.norm(pts[0] - pts[-1]) <= 1e-12 and len(pts) >= 4
+    phase = np.arange(n_sides) * (2.0 * np.pi / n_sides)
+
+    if closed:
+        ring_pts = pts[:-1]                      # 去掉闭合重复点
+        m = len(ring_pts)
+        # 框架沿 [p0..pm-1, p0] 传播,末位用于测量绕环一周的角度失配
+        t, normals, binormals = _rotation_minimizing_frames(np.vstack([ring_pts, ring_pts[:1]]))
+        # 环闭合处:传播回起点的 normal 相对初始 normal 的有符号转角
+        n_end = normals[-1] - t[0] * float(np.dot(normals[-1], t[0]))
+        n_end /= np.linalg.norm(n_end)
+        theta = float(np.arctan2(np.dot(np.cross(normals[0], n_end), t[0]),
+                                 np.dot(normals[0], n_end)))
+        # 对 N 边形旋转对称取模:整数倍 2π/N 由缝合索引偏移吸收,残余均摊
+        step = 2.0 * np.pi / n_sides
+        k = int(np.round(theta / step))
+        residual = theta - k * step
+        seg_len = np.linalg.norm(np.diff(np.vstack([ring_pts, ring_pts[:1]]), axis=0), axis=1)
+        s = np.concatenate([[0.0], np.cumsum(seg_len)])[:m] / seg_len.sum()
+        twist = -residual * s                    # 逐截面反向均摊残余转角
+        t, normals, binormals = t[:m], normals[:m], binormals[:m]
+    else:
+        m = len(pts)
+        ring_pts = pts
+        t, normals, binormals = _rotation_minimizing_frames(pts)
+        twist = np.zeros(m)
+
+    # 生成截面环顶点: (M, n_sides, 3)
+    ang = phase[None, :] + twist[:, None]
+    rings = (ring_pts[:, None, :]
+             + radius * np.cos(ang)[:, :, None] * normals[:, None, :]
+             + radius * np.sin(ang)[:, :, None] * binormals[:, None, :])
+    verts = rings.reshape(-1, 3)
+
+    faces = []
+    n_rings = m if closed else m - 1
+    for i in range(n_rings):
+        i0 = i * n_sides
+        if closed and i == m - 1:
+            base1 = 0
+            index_map = [(j + k) % n_sides for j in range(n_sides)]  # 吸收整数倍对称转角
+        else:
+            base1 = (i + 1) * n_sides
+            index_map = list(range(n_sides))
+        for j in range(n_sides):
+            j2 = (j + 1) % n_sides
+            a, b = i0 + j, i0 + j2
+            c, d = base1 + index_map[j2], base1 + index_map[j]
+            faces.append([a, b, c])
+            faces.append([a, c, d])
+
+    if not closed and end_caps:
+        v0 = len(verts)
+        verts = np.vstack([verts, ring_pts[0][None, :], ring_pts[-1][None, :]])
+        last = (m - 1) * n_sides
+        for j in range(n_sides):
+            j2 = (j + 1) % n_sides
+            faces.append([v0, j2, j])                       # 起点盖,朝 -t
+            faces.append([v0 + 1, last + j, last + j2])     # 终点盖,朝 +t
+    mesh = trimesh.Trimesh(vertices=verts, faces=np.asarray(faces, dtype=np.int64), process=False)
 
     # 上色
     rgba = (np.clip(np.concatenate([color, [1.0]]), 0, 1) * 255).astype(np.uint8)
