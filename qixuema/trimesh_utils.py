@@ -104,7 +104,9 @@ def _regular_ngon_2d(n_sides: int, radius: float, start_angle: float = 0.0) -> n
     y = radius * np.sin(angles)
     return np.column_stack([x, y])  # (N,2)
 
-def _rotation_minimizing_frames(points: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _rotation_minimizing_frames(
+    points: np.ndarray, closed: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
     """沿折线逐顶点传播正交坐标架 (tangent, normal, binormal)。
 
     用 double-reflection 法 (Wang et al. 2008) 做旋转最小化框架 (RMF):
@@ -112,25 +114,42 @@ def _rotation_minimizing_frames(points: np.ndarray) -> Tuple[np.ndarray, np.ndar
     (per-segment 独立取框架 / sweep_polygon 在近共线段会翻转,即旧实现的病灶)。
 
     Args:
-        points: (M,3),已去除重复相邻点。
+        points: (M,3),已去除重复相邻点;closed=True 时不含重复的闭合点,
+                段按 i→(i+1)%M 循环。
+        closed: 闭环模式 —— 所有顶点(含起点)的切向都取相邻两段的角平分方向
+                (否则环起点截面会立在首段的垂面上,不在角平分面里),并把框架
+                绕环传播一整圈,返回回到起点时的有符号角度失配。
     Returns:
-        (t, n, b): 三个 (M,3) 数组,逐顶点单位正交。
+        (t, n, b, closure): 三个 (M,3) 逐顶点单位正交数组;closure 为闭环
+        绕行一周后 normal 相对初始 normal 绕 t[0] 的有符号转角(开链恒 0)。
     """
     pts = np.asarray(points, dtype=np.float64)
     m = len(pts)
-    seg = pts[1:] - pts[:-1]
+    if closed:
+        seg = np.roll(pts, -1, axis=0) - pts          # m 段,末段回绕到起点
+    else:
+        seg = pts[1:] - pts[:-1]                      # m-1 段
     seg_t = seg / np.linalg.norm(seg, axis=1)[:, None]
 
     # 顶点切向 = 相邻两段切向的角平分方向;180° 折返退化时退回入段方向
     t = np.empty((m, 3))
-    t[0], t[-1] = seg_t[0], seg_t[-1]
-    if m > 2:
-        avg = seg_t[:-1] + seg_t[1:]
+    if closed:
+        prev_t = np.roll(seg_t, 1, axis=0)            # 顶点 i 的入段 = 段 i-1
+        avg = prev_t + seg_t
         norm = np.linalg.norm(avg, axis=1)
         bad = norm < 1e-8
-        avg[bad] = seg_t[:-1][bad]
+        avg[bad] = seg_t[bad]
         norm[bad] = 1.0
-        t[1:-1] = avg / norm[:, None]
+        t = avg / norm[:, None]
+    else:
+        t[0], t[-1] = seg_t[0], seg_t[-1]
+        if m > 2:
+            avg = seg_t[:-1] + seg_t[1:]
+            norm = np.linalg.norm(avg, axis=1)
+            bad = norm < 1e-8
+            avg[bad] = seg_t[:-1][bad]
+            norm[bad] = 1.0
+            t[1:-1] = avg / norm[:, None]
 
     # 初始 normal:取与 t0 最不平行的坐标轴投影到垂面
     axis = np.eye(3)[np.argmin(np.abs(t[0]))]
@@ -139,21 +158,31 @@ def _rotation_minimizing_frames(points: np.ndarray) -> Tuple[np.ndarray, np.ndar
 
     normals = np.empty((m, 3))
     normals[0] = r0
-    for i in range(m - 1):
-        v1 = pts[i + 1] - pts[i]
+    closure = 0.0
+    n_steps = m if closed else m - 1
+    r_cur = r0
+    for i in range(n_steps):
+        j = (i + 1) % m
+        v1 = seg[i]
         c1 = float(np.dot(v1, v1))
-        r_l = normals[i] - (2.0 / c1) * float(np.dot(v1, normals[i])) * v1
+        r_l = r_cur - (2.0 / c1) * float(np.dot(v1, r_cur)) * v1
         t_l = t[i] - (2.0 / c1) * float(np.dot(v1, t[i])) * v1
-        v2 = t[i + 1] - t_l
+        v2 = t[j] - t_l
         c2 = float(np.dot(v2, v2))
         r_n = r_l if c2 < 1e-12 else r_l - (2.0 / c2) * float(np.dot(v2, r_l)) * v2
         # 抵抗浮点漂移:重新正交化
-        r_n = r_n - t[i + 1] * float(np.dot(r_n, t[i + 1]))
+        r_n = r_n - t[j] * float(np.dot(r_n, t[j]))
         r_n /= np.linalg.norm(r_n)
-        normals[i + 1] = r_n
+        if closed and j == 0:
+            # 绕环一周回到起点:测量框架失配,不覆盖 normals[0]
+            closure = float(np.arctan2(np.dot(np.cross(normals[0], r_n), t[0]),
+                                       np.dot(normals[0], r_n)))
+        else:
+            normals[j] = r_n
+        r_cur = r_n
 
     binormals = np.cross(t, normals)
-    return t, normals, binormals
+    return t, normals, binormals, closure
 
 
 def polyline_to_prism(
@@ -199,13 +228,9 @@ def polyline_to_prism(
     if closed:
         ring_pts = pts[:-1]                      # 去掉闭合重复点
         m = len(ring_pts)
-        # 框架沿 [p0..pm-1, p0] 传播,末位用于测量绕环一周的角度失配
-        t, normals, binormals = _rotation_minimizing_frames(np.vstack([ring_pts, ring_pts[:1]]))
-        # 环闭合处:传播回起点的 normal 相对初始 normal 的有符号转角
-        n_end = normals[-1] - t[0] * float(np.dot(normals[-1], t[0]))
-        n_end /= np.linalg.norm(n_end)
-        theta = float(np.arctan2(np.dot(np.cross(normals[0], n_end), t[0]),
-                                 np.dot(normals[0], n_end)))
+        # 闭环模式:起点切向同样取环绕角平分(否则环起点截面不在角平分面上),
+        # 框架绕环传播一周,theta 为回到起点时的有符号角度失配
+        t, normals, binormals, theta = _rotation_minimizing_frames(ring_pts, closed=True)
         # 对 N 边形旋转对称取模:整数倍 2π/N 由缝合索引偏移吸收,残余均摊
         step = 2.0 * np.pi / n_sides
         k = int(np.round(theta / step))
@@ -213,11 +238,10 @@ def polyline_to_prism(
         seg_len = np.linalg.norm(np.diff(np.vstack([ring_pts, ring_pts[:1]]), axis=0), axis=1)
         s = np.concatenate([[0.0], np.cumsum(seg_len)])[:m] / seg_len.sum()
         twist = -residual * s                    # 逐截面反向均摊残余转角
-        t, normals, binormals = t[:m], normals[:m], binormals[:m]
     else:
         m = len(pts)
         ring_pts = pts
-        t, normals, binormals = _rotation_minimizing_frames(pts)
+        t, normals, binormals, _ = _rotation_minimizing_frames(pts)
         twist = np.zeros(m)
 
     # 生成截面环顶点: (M, n_sides, 3)
